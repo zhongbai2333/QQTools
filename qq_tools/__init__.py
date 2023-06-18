@@ -16,7 +16,6 @@ def on_load(server, prev):
 
 def on_unload(server):
     httpd.shutdown()
-    print("Bye")
 
 
 @new_thread('QQListen')
