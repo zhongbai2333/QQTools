@@ -1,0 +1,13 @@
+{
+  "id": "qq_chat",
+  "version": "0.0.1",
+  "name": "QQChat",
+  "description": {
+    "en_us": "Useful Tools with QQ",
+    "zh_cn": "QQ 与 服务器 的实用工具"
+  },
+  "author": "zhongbai233",
+  "link": "https://github.com/zhongbai2333/MCDReforgedPlugins/tree/master/qq_chat",
+  "dependencies": {
+  }
+}
