@@ -1,38 +1,44 @@
 import requests
-from flask import Flask, request
+import json
 from mcdreforged.api.all import *
-
-app = Flask(__name__)
-'''监听端口，获取QQ信息'''
-
-
-@app.route('/', methods=["POST"])
-def post_data(server: PluginServerInterface):
-    if request.get_json().get('meta_event_type') != 'heartbeat':
-        alljson = str(request.get_json())
-        server.say(alljson)
-        gid = request.get_json().get('group_id')
-        msg = request.get_json().get('raw_message')
-        if gid == 816676892:
-            server.say(msg)
-        #requests.get(url='http://127.0.0.1:5700/send_group_msg?group_id={0}&message={1}'.format(gid, msg))
-    '''下面的request.get_json().get......是用来获取关键字的值用的，关键字参考上面代码段的数据格式
-    if request.get_json().get('message_type') == 'private':  # 如果是私聊信息
-        uid = request.get_json().get('sender').get('user_id')  # 获取信息发送者的 QQ号码
-    message = request.get_json().get('raw_message')  # 获取原始信息
-    api.keyword(message, uid)  # 将 Q号和原始信息传到我们的后台
-    if request.get_json().get('message_type') == 'group':  # 如果是群聊信息
-        gid = request.get_json().get('group_id')  # 获取群号
-        uid = request.get_json().get('sender').get('user_id')  # 获取信息发送者的 QQ号码
-        message = request.get_json().get('raw_message')  # 获取原始信息
-        api.keyword(message, uid, gid)  # 将 Q号和原始信息传到我们的后台'''
-    return 'OK'
+from mcdreforged.api.types import PluginServerInterface
+from wsgiref.simple_server import make_server
+import re
 
 
-@new_thread('QQListen')
-def start_listen():
-    app.run(debug=True, host='127.0.0.1', port=5701)
+global httpd
 
 
 def on_load(server, prev):
-    start_listen()
+    cq_listen(True)
+# requests.get(url='http://127.0.0.1:5700/send_group_msg?group_id={0}&message={1}'.format(gid, msg))
+
+
+def on_unload(server):
+    httpd.shutdown()
+    print("Bye")
+
+
+@new_thread('QQListen')
+def cq_listen(start):
+    global httpd
+    port = 5701
+    httpd = make_server("0.0.0.0", port, application)
+    print("serving http on port {0}...".format(str(port)))
+    httpd.serve_forever()
+
+
+def application(environ, start_response):
+    # 定义文件请求的类型和当前请求成功的code
+    start_response('200 OK', [('Content-Type', 'application/json')])
+    # environ是当前请求的所有数据，包括Header和URL，body
+
+    request_body = environ["wsgi.input"].read(int(environ.get("CONTENT_LENGTH", 0)))
+
+    json_str = request_body.decode('utf-8')  # byte 转 str
+    json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
+    json_dict = json.loads(json_str)  # （注意：key值必须双引号）
+    if json_dict['post_type'] != 'meta_event':
+        print(json_dict)
+
+    return ()
