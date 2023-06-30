@@ -19,6 +19,7 @@ class Config(Serializable):
     groups: List[int] = [00000000, 11111111]
     admins: List[int] = [00000000, 11111111]
     server_name: str = "Survival Server"
+    main_server: bool = True
     whitelist_add_with_bound: bool = True
     why_no_whitelist: str = ""
     whitelist_remove_with_leave: bool = True
@@ -49,9 +50,9 @@ def application(environ, start_response):
     json_str = request_body.decode('utf-8')  # byte 转 str
     json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
     json_dict = json.loads(json_str)  # （注意：key值必须双引号）
-    if json_dict['post_type'] != 'meta_event':
+    if json_dict['post_type'] != 'meta_event':  # 过滤心跳数据包
         __mcdr_server.logger.info(json_dict)
-        parse_msg(json_dict)
+        parse_msg(json_dict)  # 调用处理模块
 
     return ()
 
@@ -65,7 +66,7 @@ def on_load(server: PluginServerInterface, prev_module):
         default_config={'data': {}},
         echo_in_console=False
     )['data']
-    cq_listen(config.post_host, config.post_port)
+    cq_listen(config.post_host, config.post_port)  # 调用服务器启动模块
 
 
 def on_server_startup(server: PluginServerInterface):
@@ -80,30 +81,41 @@ def on_unload(server: PluginServerInterface):
     time.sleep(0.5)
 
 
+# 消息处理模块
 def parse_msg(get_json):
-    if get_json['message_type'] == 'group' and get_json['group_id'] in config.groups:
-        __mcdr_server.logger.info("Group")
+    if get_json['message_type'] == 'group' and get_json['group_id'] in config.groups:  # 处理群聊消息
+        # __mcdr_server.logger.info("Group")
+        send_id = str(get_json['user_id'])
         msg = get_json['message']
-        if msg[0] == '#':
-            send_qq(get_json['group_id'], pares_group_command(get_json['user_id'], msg[1:]))
-    elif get_json['message_type'] == 'private':
+        if msg[0] == '#':  # 分辨命令消息
+            send_qq(get_json['group_id'], pares_group_command(send_id, msg[1:]))  # 调用命令处理模块并返回消息
+        else:
+            if str(get_json['user_id']) in data.keys() and config.forwards['qq_to_mc']:  # 检测是否绑定
+                __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg}")  # 转发消息
+            elif not str(get_json['user_id']) in data.keys() and config.forwards['qq_to_mc'] and config.main_server:
+                send_qq(get_json['group_id'], "您未在服务器绑定，请使用 #bound <ID> 绑定游戏ID")
+    elif get_json['message_type'] == 'private':  # 处理私聊消息
         __mcdr_server.logger.info("Private")
 
 
-def pares_group_command(send_id: int, command: str):
+# 命令处理模块
+def pares_group_command(send_id: str, command: str):
     command = command.split(' ')
-    if command[0] == 'bound' and len(command) == 2:
-        print(data.keys())
-        if send_id in data.keys():
-            return f'[CQ:at,qq={send_id}] 您已在{config.server_name}绑定ID: {data[send_id]}, 请联系管理员修改'
+    if command[0] == 'bound' and len(command) == 2:  # 检测 bound 命令和格式
+        if send_id in data.keys():  # 检测玩家是否已经绑定
+            if config.main_server:  # 确认服务器是否需要回复
+                return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
         else:
-            data[send_id] = command[1]
+            data[send_id] = command[1]  # 进行绑定
             save_data(__mcdr_server)
-            if config.whitelist_add_with_bound:
+            if config.whitelist_add_with_bound:  # 是否添加白名单
                 __mcdr_server.execute(f'whitelist add {command[1]}')
             else:
-                return f'[CQ:at,qq={send_id}] 已在{config.server_name}成功绑定{config.why_no_whitelist}'
-            return f'[CQ:at,qq={send_id}] 已在{config.server_name}成功绑定'
+                __mcdr_server.execute(f'whitelist reload')
+                if config.main_server:
+                    return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
+            if config.main_server:
+                return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
     elif command[0] == 'bound' and len(command) != 2:
         return '错误的格式，请使用 #bound <ID>'
     else:
