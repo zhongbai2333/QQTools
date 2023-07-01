@@ -30,6 +30,13 @@ class Config(Serializable):
     commands: Dict[str, bool] = {
         'list': True
     }
+    mysql: Dict[str, bool] = {
+        'enable': False,
+        'host': "127.0.0.1",
+        'port': "3306",
+        'user': "root",
+        'passwd': "123"
+    }
 
 
 @new_thread('QQListen')
@@ -61,11 +68,12 @@ def on_load(server: PluginServerInterface, prev_module):
     global __mcdr_server, config, data
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
-    data = server.load_config_simple(
-        'data.json',
-        default_config={'data': {}},
-        echo_in_console=False
-    )['data']
+    if not config.mysql['enable']:
+        data = server.load_config_simple(
+            'data.json',
+            default_config={'data': {}},
+            echo_in_console=False
+        )['data']
     cq_listen(config.post_host, config.post_port)  # 调用服务器启动模块
 
 
@@ -93,7 +101,7 @@ def parse_msg(get_json):
             if str(get_json['user_id']) in data.keys() and config.forwards['qq_to_mc']:  # 检测是否绑定
                 __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg}")  # 转发消息
             elif not str(get_json['user_id']) in data.keys() and config.forwards['qq_to_mc'] and config.main_server:
-                send_qq(get_json['group_id'], "您未在服务器绑定，请使用 #bound <ID> 绑定游戏ID")
+                send_qq(get_json['group_id'], "在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
     elif get_json['message_type'] == 'private':  # 处理私聊消息
         __mcdr_server.logger.info("Private")
 
@@ -114,6 +122,8 @@ def pares_group_command(send_id: str, command: str):
                 __mcdr_server.execute(f'whitelist reload')
                 if config.main_server:
                     return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
+                if not config.main_server and config.why_no_whitelist != "":
+                    return f'[CQ:at,qq={send_id}] {config.why_no_whitelist}'
             if config.main_server:
                 return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
     elif command[0] == 'bound' and len(command) != 2:
