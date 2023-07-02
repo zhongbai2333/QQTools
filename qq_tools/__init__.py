@@ -6,7 +6,7 @@ from mcdreforged.api.all import *
 from typing import List, Dict
 from wsgiref.simple_server import make_server
 
-global httpd, config, data, help_info, online_players, admin_help_info
+global httpd, config, data, help_info, online_players, admin_help_info, answer
 __mcdr_server: PluginServerInterface
 data: dict
 
@@ -241,8 +241,8 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
         if send_id in str(config.admins):
             __mcdr_server.logger.info(f"[{data[send_id]}] >> {' '.join(command[1:])}")
-            __mcdr_server.execute_command(' '.join(command[1:]))
-            return '命令执行完成！'
+            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot", 5))
+            return answer
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
@@ -265,3 +265,29 @@ def send_qq(gid: int, msg: str):
 # 保存data
 def save_data(server: PluginServerInterface):
     server.save_config_simple({'data': data}, 'data.json')
+
+
+class RobotCommandSource(CommandSource):
+    # 初始化方法，传入机器人的名字和权限等级
+    def __init__(self, name, permission_level):
+        self.name = name
+        self.permission_level = permission_level
+
+    # 重写get_permission_level方法，返回机器人的权限等级
+    def get_permission_level(self):
+        return self.permission_level
+
+    # 重写get_name方法，返回机器人的名字
+    def get_name(self):
+        return self.name
+
+    # 重写is_player方法，返回False，表示这不是一个玩家
+    def is_player(self):
+        return False
+
+    # 重写reply方法，用来回复命令来源
+    def reply(self, message, **kwargs):
+        # 这里可以自定义回复的方式，例如使用Minecraft命令或者其他方式
+        # 为了简单起见，我们只是打印出消息
+        global answer
+        answer = message
