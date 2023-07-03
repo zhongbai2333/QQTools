@@ -287,7 +287,6 @@ class RobotCommandSource(CommandSource):
 
     # 重写reply方法，用来回复命令来源
     def reply(self, message, **kwargs):
-        # 这里可以自定义回复的方式，例如使用Minecraft命令或者其他方式
-        # 为了简单起见，我们只是打印出消息
+        # 返回命令结果给answer
         global answer
         answer = message
