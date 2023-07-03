@@ -41,6 +41,42 @@ class Config(Serializable):
     }
 
 
+# 初始化帮助信息
+def initialize_help_info():
+    global help_info, admin_help_info
+    if config.auto_forwards['qq_to_mc'] and not (not config.main_server and config.mysql['enable'] == 'True'):
+        help_info = '''-帮-助-菜-单-
+    #help 获取本条信息
+    #list 获取在线玩家列表
+    #bound <ID> 绑定游戏ID
+    #admin_help 管理员帮助菜单
+--(๑•̀ㅂ•́)و✧--'''
+    elif not config.auto_forwards['qq_to_mc'] and not (not config.main_server and config.mysql['enable'] == 'True'):
+        help_info = '''-帮-助-菜-单-
+    #help 获取本条信息
+    #list 获取在线玩家列表
+    #bound <ID> 绑定游戏ID
+    #admin_help 管理员帮助菜单
+    : <msg> 转发消息至游戏
+--(๑•̀ㅂ•́)و✧--'''
+    elif config.auto_forwards['qq_to_mc'] and (not config.main_server and config.mysql['enable'] == 'True'):
+        help_info = '''-帮-助-菜-单-
+    #help 获取本条信息
+    #list 获取在线玩家列表
+    #admin_help 管理员帮助菜单
+--(๑•̀ㅂ•́)و✧--'''
+    elif not config.auto_forwards['qq_to_mc'] and (not config.main_server and config.mysql['enable'] == 'True'):
+        help_info = '''-帮-助-菜-单-
+    #help 获取本条信息
+    #list 获取在线玩家列表
+    #admin_help 管理员帮助菜单
+    : <msg> 转发消息至游戏
+--(๑•̀ㅂ•́)و✧--'''
+    admin_help_info = f'''管理员·帮助菜单
+    #{config.admin_commands['to_mcdr']} 使用MCDR命令
+--(๑•̀ㅂ•́)و✧--'''
+
+
 @new_thread('QQListen')
 def cq_listen(host: str, port: int):
     global httpd
@@ -59,7 +95,7 @@ def application(environ, start_response):
     json_str = request_body.decode('utf-8')  # byte 转 str
     json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
     json_dict = json.loads(json_str)  # （注意：key值必须双引号）
-    if json_dict['post_type'] != 'meta_event':  # 过滤心跳数据包
+    if json_dict['post_type'] == 'message':  # 过滤心跳数据包
         __mcdr_server.logger.info(json_dict)
         parse_msg(json_dict)  # 调用处理模块
 
@@ -70,24 +106,7 @@ def on_load(server: PluginServerInterface, prev_module):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
-    if config.auto_forwards['qq_to_mc']:
-        help_info = '''-帮-助-菜-单-
-#help 获取本条信息
-#list 获取在线玩家列表
-#bound <ID> 绑定游戏ID
-#admin_help 管理员帮助菜单
---(๑•̀ㅂ•́)و✧--'''
-    else:
-        help_info = '''-帮-助-菜-单-
-#help 获取本条信息
-#list 获取在线玩家列表
-#bound <ID> 绑定游戏ID
-#admin_help 管理员帮助菜单
-: <msg> 转发消息至游戏
---(๑•̀ㅂ•́)و✧--'''
-    admin_help_info = f'''管理员·帮助菜单
-#{config.admin_commands['to_mcdr']} 使用MCDR命令
---(๑•̀ㅂ•́)و✧--'''
+    initialize_help_info()
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
         server.register_command(
@@ -217,7 +236,8 @@ def pares_group_command(send_id: str, command: str):
                f"玩家列表: {', '.join(online_players)}"
 
     # bound 命令
-    elif command[0] == 'bound' and len(command) == 2:  # 检测 bound 命令和格式
+    elif command[0] == 'bound' and len(command) == 2 and \
+            not (not config.main_server and config.mysql['enable'] == 'True'):  # 检测 bound 命令和格式
         if send_id in data.keys():  # 检测玩家是否已经绑定
             if config.main_server:  # 确认服务器是否需要回复
                 return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
@@ -241,8 +261,9 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
         if send_id in str(config.admins):
             __mcdr_server.logger.info(f"[{data[send_id]}] >> {' '.join(command[1:])}")
-            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot", 5))
-            return answer
+            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot"))
+            __mcdr_server.logger.info(answer)
+            return str(answer)
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
@@ -269,13 +290,12 @@ def save_data(server: PluginServerInterface):
 
 class RobotCommandSource(CommandSource):
     # 初始化方法，传入机器人的名字和权限等级
-    def __init__(self, name, permission_level):
+    def __init__(self, name):
         self.name = name
-        self.permission_level = permission_level
 
     # 重写get_permission_level方法，返回机器人的权限等级
     def get_permission_level(self):
-        return self.permission_level
+        return PermissionLevel.OWNER
 
     # 重写get_name方法，返回机器人的名字
     def get_name(self):
@@ -290,3 +310,9 @@ class RobotCommandSource(CommandSource):
         # 返回命令结果给answer
         global answer
         answer = message
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return 'QQbot[plugin=qq_tools]'
