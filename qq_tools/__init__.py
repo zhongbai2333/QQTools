@@ -6,9 +6,14 @@ from mcdreforged.api.all import *
 from typing import List, Dict
 from wsgiref.simple_server import make_server
 
-global httpd, config, data, help_info, online_players, admin_help_info, answer
+global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use
 __mcdr_server: PluginServerInterface
 data: dict
+try:  # 试图导入mysql处理
+    import mysql.connector
+    mysql_use = True
+except ImportError:
+    mysql_use = False
 
 
 class Config(Serializable):
@@ -33,6 +38,7 @@ class Config(Serializable):
         'enable': "False",
         'host': "127.0.0.1",
         'port': "3306",
+        'database': "MCDR_QQTools",
         'user': "root",
         'passwd': "123"
     }
@@ -44,31 +50,18 @@ class Config(Serializable):
 # 初始化帮助信息
 def initialize_help_info():
     global help_info, admin_help_info
-    if config.auto_forwards['qq_to_mc'] and not (not config.main_server and config.mysql['enable'] == 'True'):
+    if config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound <ID> 绑定游戏ID
     #admin_help 管理员帮助菜单
 --(๑•̀ㅂ•́)و✧--'''
-    elif not config.auto_forwards['qq_to_mc'] and not (not config.main_server and config.mysql['enable'] == 'True'):
+    elif not config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound <ID> 绑定游戏ID
-    #admin_help 管理员帮助菜单
-    : <msg> 转发消息至游戏
---(๑•̀ㅂ•́)و✧--'''
-    elif config.auto_forwards['qq_to_mc'] and (not config.main_server and config.mysql['enable'] == 'True'):
-        help_info = '''-帮-助-菜-单-
-    #help 获取本条信息
-    #list 获取在线玩家列表
-    #admin_help 管理员帮助菜单
---(๑•̀ㅂ•́)و✧--'''
-    elif not config.auto_forwards['qq_to_mc'] and (not config.main_server and config.mysql['enable'] == 'True'):
-        help_info = '''-帮-助-菜-单-
-    #help 获取本条信息
-    #list 获取在线玩家列表
     #admin_help 管理员帮助菜单
     : <msg> 转发消息至游戏
 --(๑•̀ㅂ•́)و✧--'''
@@ -116,7 +109,7 @@ def on_load(server: PluginServerInterface, prev_module):
             )
         )
     online_players = []
-    if config.mysql['enable'] == "False":
+    if not str_to_bool(config.mysql['enable']):
         data = server.load_config_simple(
             'data.json',
             default_config={'data': {}},
@@ -124,7 +117,13 @@ def on_load(server: PluginServerInterface, prev_module):
         )['data']
     source = __mcdr_server.get_plugin_command_source()
     __mcdr_server.logger.info(source)
-    cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
+    if not str_to_bool(config.mysql['enable']):  # 未开启mysql功能
+        cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
+    elif str_to_bool(config.mysql['enable']) and mysql_use:  # 启用mysql功能且mysql-connector-python已安装
+        __mcdr_server.logger.info("MySQL数据库功能已正常启动！")
+        cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
+    elif str_to_bool(config.mysql['enable']) and not mysql_use:
+        __mcdr_server.logger.info("QQTools无法启动，请安装mysql-connector-python或关闭数据库功能！")
 
 
 def on_server_startup(server: PluginServerInterface):
@@ -199,8 +198,7 @@ def parse_msg(get_json):
                     send_qq(get_json['group_id'],
                             f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
                 else:
-                    msg = msg[2:]  # 删除命令部分
-                    __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg}")  # 转发消息
+                    __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg[2:]}")  # 删除命令部分并转发消息
             else:
                 send_qq(get_json['group_id'], "错误的格式，请使用 : <msg>")  # 错误提示
         else:
@@ -237,7 +235,7 @@ def pares_group_command(send_id: str, command: str):
 
     # bound 命令
     elif command[0] == 'bound' and len(command) == 2 and \
-            not (not config.main_server and config.mysql['enable'] == 'True'):  # 检测 bound 命令和格式
+            not (not config.main_server and str_to_bool(config.mysql['enable'])):  # 检测 bound 命令和格式
         if send_id in data.keys():  # 检测玩家是否已经绑定
             if config.main_server:  # 确认服务器是否需要回复
                 return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
@@ -274,7 +272,7 @@ def pares_group_command(send_id: str, command: str):
         return '错误的命令，请使用 #help 获取帮助！'
 
 
-# 发送消息指QQ
+# 发送消息至QQ
 def send_qq(gid: int, msg: str):
     msg = msg.replace('#', '%23')
     __mcdr_server.logger.info(msg)
@@ -286,6 +284,11 @@ def send_qq(gid: int, msg: str):
 # 保存data
 def save_data(server: PluginServerInterface):
     server.save_config_simple({'data': data}, 'data.json')
+
+
+def str_to_bool(s):
+    s_lower = s.lower()
+    return s_lower == "true"
 
 
 class RobotCommandSource(CommandSource):
