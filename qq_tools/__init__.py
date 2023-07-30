@@ -1,19 +1,20 @@
-import requests
-import json
-import re
-import time
-from mcdreforged.api.all import *
 from typing import List, Dict
 from wsgiref.simple_server import make_server
 
-global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use
+import json
+import re
+import requests
+import time
+from .MySQL_Control import connect_and_query_db, create_table_if_not_exists
+from mcdreforged.api.all import *
+
+global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 __mcdr_server: PluginServerInterface
 data: dict
 try:  # 试图导入mysql处理
     import mysql.connector
-    mysql_use = True
 except ImportError:
-    mysql_use = False
+    mysql = None
 
 
 class Config(Serializable):
@@ -27,6 +28,7 @@ class Config(Serializable):
     main_server: bool = True
     whitelist_add_with_bound: bool = True
     why_no_whitelist: str = ""
+    whitelist_path: str = "./server/whitelist.json"
     whitelist_remove_with_leave: bool = True
     forwards_mcdr_command: bool = True
     forwards_server_start: bool = True
@@ -34,16 +36,17 @@ class Config(Serializable):
         'mc_to_qq': False,
         'qq_to_mc': False
     }
-    mysql: Dict[str, str] = {
-        'enable': "False",
+    mysql_enable: bool = False
+    mysql_config: Dict[str, str] = {
         'host': "127.0.0.1",
         'port': "3306",
         'database': "MCDR_QQTools",
         'user': "root",
-        'passwd': "123"
+        'password': "123"
     }
     admin_commands: Dict[str, str] = {
-        'to_mcdr': "tomcdr"
+        'to_mcdr': "tomcdr",
+        'to_minecraft': "togame"
     }
 
 
@@ -67,6 +70,7 @@ def initialize_help_info():
 --(๑•̀ㅂ•́)و✧--'''
     admin_help_info = f'''管理员·帮助菜单
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
+    #{config.admin_commands['to_minecraft']} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
 
 
@@ -96,10 +100,13 @@ def application(environ, start_response):
 
 
 def on_load(server: PluginServerInterface, prev_module):
-    global __mcdr_server, config, data, help_info, online_players, admin_help_info
+    global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     initialize_help_info()
+    wait_list = []
+    online_players = []
+
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
         server.register_command(
@@ -108,25 +115,35 @@ def on_load(server: PluginServerInterface, prev_module):
                 GreedyText('message').runs(command_qq)
             )
         )
-    online_players = []
-    if not str_to_bool(config.mysql['enable']):
+
+    if not config.mysql_enable:
         data = server.load_config_simple(
             'data.json',
             default_config={'data': {}},
             echo_in_console=False
         )['data']
+
     source = __mcdr_server.get_plugin_command_source()
     __mcdr_server.logger.info(source)
-    if not str_to_bool(config.mysql['enable']):  # 未开启mysql功能
+
+    if not config.mysql_enable:  # 未开启mysql功能
         cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
-    elif str_to_bool(config.mysql['enable']) and mysql_use:  # 启用mysql功能且mysql-connector-python已安装
+    elif config.mysql_enable and mysql:  # 启用mysql功能且mysql-connector-python已安装
+        MySQL_Control.create_table_if_not_exists("user_list", "id INT AUTO_INCREMENT PRIMARY KEY,qq_id INT,player_id "
+                                                              "VARCHAR(20),event_time TIMESTAMP DEFAULT "
+                                                              "CURRENT_TIMESTAMP", config.mysql_config)
         __mcdr_server.logger.info("MySQL数据库功能已正常启动！")
         cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
-    elif str_to_bool(config.mysql['enable']) and not mysql_use:
+    elif config.mysql_enable and not mysql:
         __mcdr_server.logger.info("QQTools无法启动，请安装mysql-connector-python或关闭数据库功能！")
 
 
 def on_server_startup(server: PluginServerInterface):
+    global server_status
+    server_status = True
+    if wait_list:
+        for i in wait_list:
+            send_execute_mc(i)
     if config.forwards_server_start:
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
             msg_start = config.server_name + ' 启动完成，服务器已启用自动转发QQ信息！'
@@ -134,6 +151,11 @@ def on_server_startup(server: PluginServerInterface):
             msg_start = config.server_name + ' 启动完成，服务器已启用手动转发QQ信息！'
         for i in config.groups:
             send_qq(i, msg_start)
+
+
+def on_server_stop(server: PluginServerInterface, server_return_code: int):
+    global server_status
+    server_status = False
 
 
 def on_unload(server: PluginServerInterface):
@@ -235,7 +257,7 @@ def pares_group_command(send_id: str, command: str):
 
     # bound 命令
     elif command[0] == 'bound' and len(command) == 2 and \
-            not (not config.main_server and str_to_bool(config.mysql['enable'])):  # 检测 bound 命令和格式
+            not (not config.main_server and config.mysql_enable):  # 检测 bound 命令和格式
         if send_id in data.keys():  # 检测玩家是否已经绑定
             if config.main_server:  # 确认服务器是否需要回复
                 return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
@@ -243,9 +265,9 @@ def pares_group_command(send_id: str, command: str):
             data[send_id] = command[1]  # 进行绑定
             save_data(__mcdr_server)
             if config.whitelist_add_with_bound:  # 是否添加白名单
-                __mcdr_server.execute(f'whitelist add {command[1]}')
+                send_execute_mc(f'whitelist add {command[1]}')
             else:
-                __mcdr_server.execute(f'whitelist reload')
+                send_execute_mc(f'whitelist reload')
                 if config.main_server:
                     return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
                 if not config.main_server and config.why_no_whitelist != "":
@@ -267,6 +289,19 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
         return '错误的格式，请使用 #tomcdr <command>'
 
+    # togame 命令
+    elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
+        if send_id in str(config.admins):
+            return rcon_execute(' '.join(command[1:]))
+        else:
+            return '抱歉您不是管理员，无权使用该命令！'
+    elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
+        return '错误的格式，请使用 #tomcdr <command>'
+
+    # debug 命令 作为测试触发器使用
+    elif command[0] == 'debug':
+        return 'Nothing'
+
     # 未知命令
     else:
         return '错误的命令，请使用 #help 获取帮助！'
@@ -281,14 +316,39 @@ def send_qq(gid: int, msg: str):
                                                                             msg))
 
 
+# 把命令执行独立出来，以防服务器处在待机状态
+def send_execute_mc(command: str):
+    if server_status:  # 确认服务器是否启动
+        __mcdr_server.execute(command)
+    else:
+        wait_list.append(command)  # 堆着等开服
+
+
+# RCON相关
+def rcon_execute(command: str):
+    if __mcdr_server.is_rcon_running():
+        result = __mcdr_server.rcon_query(command)
+        if result == '':
+            result = '该指令没有返回值'
+    else:
+        __mcdr_server.execute(command)
+        result = '由于未启用 RCON，没有返回结果'
+    return result
+
+
+# 获取白名单
+def get_whitelist():
+    name_list = []
+    with open(config.whitelist_path, 'r', encoding='utf8') as fp:
+        json_data = json.load(fp)
+        for i in json_data:
+            name_list.append(i['name'])
+        return name_list
+
+
 # 保存data
 def save_data(server: PluginServerInterface):
     server.save_config_simple({'data': data}, 'data.json')
-
-
-def str_to_bool(s):
-    s_lower = s.lower()
-    return s_lower == "true"
 
 
 class RobotCommandSource(CommandSource):
