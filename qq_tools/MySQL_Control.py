@@ -4,7 +4,7 @@ except ImportError:
     mysql = None
 
 
-def connect_and_query_db(your_table_name: str, db_config):
+def connect_and_query_db(list_name: str, table_name: str, db_config):
     if not mysql:
         return None
     try:
@@ -13,14 +13,39 @@ def connect_and_query_db(your_table_name: str, db_config):
         # 创建游标对象
         cursor = conn.cursor()
         # 示例查询
-        query = f"SELECT * FROM {your_table_name};"
+        query = f"SELECT {list_name} FROM {table_name};"
         cursor.execute(query)
         # 获取查询结果
         result = cursor.fetchall()
         # 关闭游标和连接
         cursor.close()
         conn.close()
-        return result
+        return result[0]
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return None
+
+
+def connect_and_insert_db(list_name: str, table_name: str, data: tuple, db_config):
+    if not mysql:
+        return None
+    try:
+        # 创建连接
+        conn = mysql.connector.connect(**db_config)
+        # 创建游标对象
+        cursor = conn.cursor()
+        # 示例查询
+        count_data = "%s," * list_name.count(",") + "%s"
+        query = f"INSERT INTO {table_name} ({list_name}) VALUES ({count_data});"
+        print(query)
+        cursor.execute(query, data)
+        # 提交操作
+        conn.commit()
+        # 关闭游标和连接
+        cursor.close()
+        conn.close()
+        print(f"Table '{table_name}' be inserted successfully.")
 
     except mysql.connector.Error as err:
         print(f"Error: {err}")
@@ -51,3 +76,4 @@ def create_table_if_not_exists(table_name: str, table_type: str, db_config):
 
     except mysql.connector.Error as err:
         print(f"Error: {err}")
+        return None

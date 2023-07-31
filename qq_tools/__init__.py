@@ -5,7 +5,7 @@ import json
 import re
 import requests
 import time
-from .MySQL_Control import connect_and_query_db, create_table_if_not_exists
+from .MySQL_Control import connect_and_query_db, create_table_if_not_exists, connect_and_insert_db
 from mcdreforged.api.all import *
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
@@ -129,8 +129,8 @@ def on_load(server: PluginServerInterface, prev_module):
     if not config.mysql_enable:  # 未开启mysql功能
         cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
     elif config.mysql_enable and mysql:  # 启用mysql功能且mysql-connector-python已安装
-        MySQL_Control.create_table_if_not_exists("user_list", "id INT AUTO_INCREMENT PRIMARY KEY,qq_id INT,player_id "
-                                                              "VARCHAR(20),event_time TIMESTAMP DEFAULT "
+        MySQL_Control.create_table_if_not_exists("user_list", "id INT AUTO_INCREMENT PRIMARY KEY,qq_id VARCHAR(15),"
+                                                              "player_id VARCHAR(20),event_time TIMESTAMP DEFAULT "
                                                               "CURRENT_TIMESTAMP", config.mysql_config)
         __mcdr_server.logger.info("MySQL数据库功能已正常启动！")
         cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
@@ -141,9 +141,17 @@ def on_load(server: PluginServerInterface, prev_module):
 def on_server_startup(server: PluginServerInterface):
     global server_status
     server_status = True
-    if wait_list:
+    if wait_list:  # 服务器核心重启后处理堆积命令
         for i in wait_list:
             send_execute_mc(i)
+    if config.mysql_enable and config.whitelist_add_with_bound:
+        diff_player = get_diff_list(  # 检查数据库有没有新的玩家
+            connect_and_query_db("player_id", "user_list", config.mysql_config),
+            get_whitelist()
+        )
+        if diff_player:
+            for i in diff_player:
+                send_execute_mc(f'whitelist add {i}')  # 加一下新玩家
     if config.forwards_server_start:
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
             msg_start = config.server_name + ' 启动完成，服务器已启用自动转发QQ信息！'
@@ -216,21 +224,39 @@ def parse_msg(get_json):
             send_qq(get_json['group_id'], pares_group_command(send_id, msg[1:]))  # 调用命令处理模块并返回消息
         elif not config.auto_forwards['qq_to_mc'] and msg[0] == ':':  # 确认是否开启手动转发以及是否使用命令
             if msg[2:] != "":  # 检测命令语句是否合法
-                if not str(get_json['user_id']) in data.keys():  # 检测玩家是否已绑定
-                    send_qq(get_json['group_id'],
-                            f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
+                if config.mysql_enable:
+                    qq_list = connect_and_query_db("qq_id", "user_list", config.mysql_config)
+                    if not str(get_json['user_id']) in qq_list:
+                        send_qq(get_json['group_id'],
+                                f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
+                    else:
+                        player_list = connect_and_query_db("player_id", "user_list", config.mysql_config)
+                        qq_list_id = qq_list.index(send_id)
+                        __mcdr_server.say(f"§7[QQ][{player_list[qq_list_id]}] {msg[2:]}")  # 删除命令部分并转发消息
                 else:
-                    __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg[2:]}")  # 删除命令部分并转发消息
+                    if not str(get_json['user_id']) in data.keys():  # 检测玩家是否已绑定
+                        send_qq(get_json['group_id'],
+                                f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
+                    else:
+                        __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg[2:]}")  # 删除命令部分并转发消息
             else:
                 send_qq(get_json['group_id'], "错误的格式，请使用 : <msg>")  # 错误提示
-        else:
-            if str(get_json['user_id']) in data.keys():  # 检测是否绑定且自动转发开了
-                if config.auto_forwards['qq_to_mc']:
+        elif config.auto_forwards['qq_to_mc']:
+            if config.mysql_enable:
+                qq_list = connect_and_query_db("qq_id", "user_list", config.mysql_config)
+                if str(get_json['user_id']) in qq_list:
+                    player_list = connect_and_query_db("player_id", "user_list", config.mysql_config)
+                    qq_list_id = qq_list.index(send_id)
+                    __mcdr_server.say(f"§7[QQ][{player_list[qq_list_id]}] {msg}")  # 转发消息
+                elif not str(get_json['user_id']) in qq_list and config.main_server:
+                    send_qq(get_json['group_id'],
+                            f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
+            else:
+                if str(get_json['user_id']) in data.keys():  # 检测是否绑定
                     __mcdr_server.say(f"§7[QQ][{data[send_id]}] {msg}")  # 转发消息
-            elif not str(get_json['user_id']) in data.keys() \
-                    and config.auto_forwards['qq_to_mc'] and config.main_server:
-                send_qq(get_json['group_id'],
-                        f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
+                elif not str(get_json['user_id']) in data.keys() and config.main_server:
+                    send_qq(get_json['group_id'],
+                            f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
     elif get_json['message_type'] == 'private':  # 处理私聊消息
         __mcdr_server.logger.info("Private")
 
@@ -258,29 +284,42 @@ def pares_group_command(send_id: str, command: str):
     # bound 命令
     elif command[0] == 'bound' and len(command) == 2 and \
             not (not config.main_server and config.mysql_enable):  # 检测 bound 命令和格式
-        if send_id in data.keys():  # 检测玩家是否已经绑定
-            if config.main_server:  # 确认服务器是否需要回复
+        if config.mysql_enable:  # 数据库版本bound
+            if send_id in connect_and_query_db("qq_id", "user_list", config.mysql_config):  # 检查玩家
                 return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
-        else:
-            data[send_id] = command[1]  # 进行绑定
-            save_data(__mcdr_server)
-            if config.whitelist_add_with_bound:  # 是否添加白名单
-                send_execute_mc(f'whitelist add {command[1]}')
             else:
-                send_execute_mc(f'whitelist reload')
-                if config.main_server:
+                db_data = (send_id, command[1])
+                connect_and_insert_db("qq_id,player_id", "user_list", db_data, config.mysql_config)
+                if config.whitelist_add_with_bound:  # 是否添加白名单
+                    send_execute_mc(f'whitelist add {command[1]}')
+                else:
+                    send_execute_mc(f'whitelist reload')
                     return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
-                if not config.main_server and config.why_no_whitelist != "":
-                    return f'[CQ:at,qq={send_id}] {config.why_no_whitelist}'
-            if config.main_server:
                 return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
+        else:  # 文件版本bound
+            if send_id in data.keys():  # 检测玩家是否已经绑定
+                if config.main_server:  # 确认服务器是否需要回复
+                    return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {data[send_id]}, 请联系管理员修改'
+            else:
+                data[send_id] = command[1]  # 进行绑定
+                save_data(__mcdr_server)
+                if config.whitelist_add_with_bound:  # 是否添加白名单
+                    send_execute_mc(f'whitelist add {command[1]}')
+                else:
+                    send_execute_mc(f'whitelist reload')
+                    if config.main_server:
+                        return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
+                    if not config.main_server and config.why_no_whitelist != "":
+                        return f'[CQ:at,qq={send_id}] {config.why_no_whitelist}'
+                if config.main_server:
+                    return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
     elif command[0] == 'bound' and len(command) != 2:
         return '错误的格式，请使用 #bound <ID>'
 
     # tomcdr 命令
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
         if send_id in str(config.admins):
-            __mcdr_server.logger.info(f"[{data[send_id]}] >> {' '.join(command[1:])}")
+            __mcdr_server.logger.info(f"[QQTools] >> {' '.join(command[1:])}")
             __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot"))
             __mcdr_server.logger.info(answer)
             return str(answer)
@@ -349,6 +388,16 @@ def get_whitelist():
 # 保存data
 def save_data(server: PluginServerInterface):
     server.save_config_simple({'data': data}, 'data.json')
+
+
+# 集合处理
+def get_diff_list(set1: list, set2: list):
+    if set1 and set2:
+        set1 = set(set1)
+        set2 = set(set2)
+        diff = set1 - set2
+        return list(diff)
+    return None
 
 
 class RobotCommandSource(CommandSource):
