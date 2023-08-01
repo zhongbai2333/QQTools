@@ -20,7 +20,7 @@ def connect_and_query_db(list_name: str, table_name: str, db_config):
         # 关闭游标和连接
         cursor.close()
         conn.close()
-        return result[0]
+        return result
 
     except mysql.connector.Error as err:
         print(f"Error: {err}")
@@ -46,6 +46,29 @@ def connect_and_insert_db(list_name: str, table_name: str, data: tuple, db_confi
         cursor.close()
         conn.close()
         print(f"Table '{table_name}' be inserted successfully.")
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return None
+
+
+def connect_and_delete_data(table_name: str, condition: str, db_config):
+    if not mysql:
+        return None
+    try:
+        # 创建连接
+        conn = mysql.connector.connect(**db_config)
+        # 创建游标对象
+        cursor = conn.cursor()
+        # 删除符合条件的一行数据
+        query = f"DELETE FROM {table_name} WHERE {condition};"
+        cursor.execute(query)
+        # 提交事务
+        conn.commit()
+        # 关闭游标和连接
+        cursor.close()
+        conn.close()
+        print(f"Table '{table_name}' be deleted successfully.")
 
     except mysql.connector.Error as err:
         print(f"Error: {err}")
