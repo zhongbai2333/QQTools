@@ -1,10 +1,10 @@
 from typing import List, Dict
-from wsgiref.simple_server import make_server
 
 import json
 import re
 import requests
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from .MySQL_Control import connect_and_query_db, create_table_if_not_exists, connect_and_insert_db
 from mcdreforged.api.all import *
 
@@ -77,26 +77,44 @@ def initialize_help_info():
 @new_thread('QQListen')
 def cq_listen(host: str, port: int):
     global httpd
-    httpd = make_server(host, port, application)
+    # 设置服务器地址和端口
+    server_address = (host, port)
+    httpd = HTTPServer(server_address, MyRequestHandler)
     __mcdr_server.logger.info("Serving http on port {0}...".format(str(port)))
     httpd.serve_forever()
 
 
-def application(environ, start_response):
-    # 定义文件请求的类型和当前请求成功的code
-    start_response('200 OK', [('Content-Type', 'application/json')])
-    # environ是当前请求的所有数据，包括Header和URL，body
+# 自定义请求处理器类
+class MyRequestHandler(BaseHTTPRequestHandler):
+    def log_request(self, code='-', size='-'):
+        # 重写log_request方法，取消日志打印
+        pass
 
-    request_body = environ["wsgi.input"].read(int(environ.get("CONTENT_LENGTH", 0)))
+    def do_POST(self):
+        # 设置响应头
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
 
-    json_str = request_body.decode('utf-8')  # byte 转 str
-    json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
-    json_dict = json.loads(json_str)  # （注意：key值必须双引号）
-    if json_dict['post_type'] == 'message':  # 过滤心跳数据包
-        __mcdr_server.logger.info(json_dict)
-        parse_msg(json_dict)  # 调用处理模块
+        # 读取请求数据
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        json_str = post_data.decode('utf-8')  # byte 转 str
+        json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
+        json_dict = json.loads(json_str)  # （注意：key值必须双引号）
+        if json_dict['post_type'] == 'message':  # 过滤心跳数据包
+            print(json_dict)
+            parse_msg(json_dict)  # 调用处理模块
 
-    return ()
+        try:
+            # 处理请求数据
+            data_post = json.loads(post_data)
+            response_data = {"message": "Success", "received_data": data_post}
+        except json.JSONDecodeError:
+            response_data = {"message": "Invalid JSON"}
+
+        # 发送响应
+        self.wfile.write(json.dumps(response_data).encode('utf-8'))
 
 
 def on_load(server: PluginServerInterface, prev_module):
@@ -170,7 +188,7 @@ def on_server_stop(server: PluginServerInterface, server_return_code: int):
 
 
 def on_unload(server: PluginServerInterface):
-    httpd.shutdown()
+    httpd.server_close()
     __mcdr_server.logger.info("Http server stopping now...")
     time.sleep(0.5)
 
