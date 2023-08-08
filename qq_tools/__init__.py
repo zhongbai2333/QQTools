@@ -9,6 +9,7 @@ from .MySQL_Control import connect_and_query_db, create_table_if_not_exists, con
 from mcdreforged.api.all import *
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
+global debug_json_mode
 __mcdr_server: PluginServerInterface
 data: dict
 try:  # 试图导入mysql处理
@@ -32,6 +33,7 @@ class Config(Serializable):
     whitelist_remove_with_leave: bool = True
     forwards_mcdr_command: bool = True
     forwards_server_start: bool = True
+    debug: bool = False
     auto_forwards: Dict[str, bool] = {
         'mc_to_qq': False,
         'qq_to_mc': False
@@ -68,7 +70,15 @@ def initialize_help_info():
     #admin_help 管理员帮助菜单
     : <msg> 转发消息至游戏
 --(๑•̀ㅂ•́)و✧--'''
-    admin_help_info = f'''管理员·帮助菜单
+    if config.debug:
+        admin_help_info = f'''管理员·帮助菜单
+    #{config.admin_commands['to_mcdr']} 使用MCDR命令
+    #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+    #debug_json <all/no_heart/stop> 测试Json数据包
+    #debug 开发通用触发器
+--(๑•̀ㅂ•́)و✧--'''
+    else:
+        admin_help_info = f'''管理员·帮助菜单
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
@@ -102,8 +112,15 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         json_str = post_data.decode('utf-8')  # byte 转 str
         json_str = re.sub('\'', '\"', json_str)  # 单引号转双引号, json.loads 必须使用双引号
         json_dict = json.loads(json_str)  # （注意：key值必须双引号）
+        if debug_json_mode == 1:
+            send_qq(config.groups[0], str(json_dict))
+        elif debug_json_mode == 2:
+            if json_dict['post_type'] == 'meta_event':
+                if json_dict['meta_event_type'] != 'heartbeat':
+                    send_qq(config.groups[0], str(json_dict))
+            elif json_dict['post_type'] == 'message':
+                send_qq(config.groups[0], str(json_dict))
         if json_dict['post_type'] == 'message':  # 过滤心跳数据包
-            print(json_dict)
             parse_msg(json_dict)  # 调用处理模块
 
         try:
@@ -118,12 +135,13 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 
 def on_load(server: PluginServerInterface, prev_module):
-    global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list
+    global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     initialize_help_info()
     wait_list = []
     online_players = []
+    debug_json_mode = 0
 
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
@@ -333,10 +351,31 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
         return '错误的格式，请使用 #tomcdr <command>'
 
+    # debug_json 命令
+    elif command[0] == 'debug_json' and config.debug and send_id in str(config.admins):
+        global debug_json_mode
+        if len(command) < 2:
+            return '错误的命令，格式为#debug_json <all/no_heart/stop>'
+        elif command[1] == "all":
+            debug_json_mode = 1
+            return 'Json测试开启，模式：全部Json'
+        elif command[1] == "no_heart":
+            debug_json_mode = 2
+            return 'Json测试开启，模式：无心跳数据包'
+        elif command[1] == "stop":
+            debug_json_mode = 0
+            return 'Json测试关闭'
+        else:
+            return '错误的命令，格式为#debug_json <all/no_heart/stop>'
+    elif command[0] == 'debug_json' and config.debug and send_id not in str(config.admins):
+        return '抱歉您不是管理员，无权使用该命令！'
+
     # debug 命令 作为测试触发器使用
-    elif command[0] == 'debug':
+    elif command[0] == 'debug' and config.debug and send_id in str(config.admins):
         db_ans = dict(connect_and_query_db("qq_id,player_id", "user_list", config.mysql_config))
         return str(db_ans)
+    elif command[0] == 'debug' and config.debug and send_id not in str(config.admins):
+        return '抱歉您不是管理员，无权使用该命令！'
 
     # 未知命令
     else:
@@ -346,7 +385,8 @@ def pares_group_command(send_id: str, command: str):
 # 发送消息至QQ
 def send_qq(gid: int, msg: str):
     msg = msg.replace('#', '%23')
-    __mcdr_server.logger.info(msg)
+    if config.debug:
+        __mcdr_server.logger.info(msg)
     requests.get(
         url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port, gid,
                                                                             msg))
