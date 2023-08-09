@@ -5,7 +5,8 @@ import re
 import requests
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from .MySQL_Control import connect_and_query_db, create_table_if_not_exists, connect_and_insert_db
+from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
+                            connect_and_delete_data)
 from mcdreforged.api.all import *
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
@@ -120,9 +121,12 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                     send_qq(config.groups[0], str(json_dict))
             elif json_dict['post_type'] == 'message':
                 send_qq(config.groups[0], str(json_dict))
-        if json_dict['post_type'] == 'message':  # 过滤心跳数据包
+            elif json_dict['post_type'] == 'notice':
+                send_qq(config.groups[0], str(json_dict))
+        if json_dict['post_type'] == 'message':  # 过滤message数据包
             parse_msg(json_dict)  # 调用处理模块
-
+        elif json_dict['post_type'] == 'notice':  # 过滤notice数据包
+            join_and_leave_group(json_dict)
         try:
             # 处理请求数据
             data_post = json.loads(post_data)
@@ -183,6 +187,9 @@ def on_server_startup(server: PluginServerInterface):
     if config.mysql_enable and config.whitelist_add_with_bound:
         db_player_list = connect_and_query_db("player_id", "user_list", config.mysql_config)
         result_list = [element for tup in db_player_list for element in tup]
+        if config.debug:
+            __mcdr_server.logger.info(f"UserList: {result_list}")
+            __mcdr_server.logger.info(f"WhiteList: {get_whitelist()}")
         diff_player = get_diff_list(  # 检查数据库有没有新的玩家
             result_list,
             get_whitelist()
@@ -191,6 +198,16 @@ def on_server_startup(server: PluginServerInterface):
             for i in diff_player:
                 __mcdr_server.logger.info(f"New Player! Name:{i}")
                 send_execute_mc(f'whitelist add {i}')  # 加一下新玩家
+
+        diff_player = get_diff_list(  # 检查数据库有没有老的玩家
+            get_whitelist(),
+            result_list
+        )
+        if diff_player:
+            for i in diff_player:
+                __mcdr_server.logger.info(f"Wrong Player! Name:{i}")
+                send_execute_mc(f'whitelist remove {i}')  # 删一下老玩家
+
     if config.forwards_server_start:
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
             msg_start = config.server_name + ' 启动完成，服务器已启用自动转发QQ信息！'
@@ -282,6 +299,33 @@ def parse_msg(get_json):
         __mcdr_server.logger.info("Private")
 
 
+# 进出群处理
+def join_and_leave_group(get_json):
+    send_id = str(get_json['user_id'])
+    if get_json['notice_type'] == 'group_increase':  # 进群处理
+        if config.auto_forwards['qq_to_mc']:  # 是否已开启自动转发
+            send_qq(get_json['group_id'],
+                    f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器将自动把群消息同步至服务器聊天栏")
+        else:
+            send_qq(get_json['group_id'],
+                    f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器需使用命令: <msg>把群消息同步至服务器聊天栏")
+    elif get_json['notice_type'] == 'group_decrease':  # 退群处理
+        user_list = get_user_list()
+        if config.whitelist_remove_with_leave:  # 是否自动删除白名单
+            if send_id in user_list.keys():  # 确认是否绑定过
+                send_execute_mc(f'whitelist remove {user_list[send_id]}')
+                send_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群，已在服务器移除他的白名单')
+                delete_user(send_id)
+            else:
+                send_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
+        else:
+            if send_id in user_list.keys():
+                send_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群')
+                delete_user(send_id)
+            else:
+                send_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
+
+
 # 命令处理模块
 def pares_group_command(send_id: str, command: str):
     command = command.split(' ')  # 解析信息为列表
@@ -306,26 +350,27 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == 'bound' and len(command) == 2 and \
             not (not config.main_server and config.mysql_enable):  # 检测 bound 命令和格式
         user_list = get_user_list()
-        if send_id in user_list.keys():  # 检查玩家
-            return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {user_list[send_id]}, 请联系管理员修改'
+        if send_id in user_list.keys():  # 检测玩家是否已经绑定
+            if config.main_server:  # 确认服务器是否需要回复
+                return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {user_list[send_id]}, 请联系管理员修改'
+        elif command[1] in user_list.values():  # 查看id是否已存在
+            if config.main_server:  # 确认服务器是否需要回复
+                player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[1])]
+                return f'[CQ:at,qq={send_id}] ID：{command[1]} 已被 [CQ:at,qq={player_id_qq}] 在服务器绑定, 请联系管理员修改'
         else:
-            if send_id in user_list.keys():  # 检测玩家是否已经绑定
-                if config.main_server:  # 确认服务器是否需要回复
-                    return f'[CQ:at,qq={send_id}] 您已在服务器绑定ID: {user_list[send_id]}, 请联系管理员修改'
-            else:
-                send_user_list(send_id, command[1])  # 进行绑定
-                if config.whitelist_add_with_bound:  # 是否添加白名单
-                    send_execute_mc(f'whitelist add {command[1]}')
-                    if config.main_server:
-                        return f'[CQ:at,qq={send_id}] 已为你自动获取白名单'
-                else:
-                    send_execute_mc(f'whitelist reload')
-                    if config.main_server:
-                        return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
-                    elif not config.main_server and config.why_no_whitelist != "":
-                        return f'[CQ:at,qq={send_id}] {config.why_no_whitelist}'
+            send_user_list(send_id, command[1])  # 进行绑定
+            if config.whitelist_add_with_bound:  # 是否添加白名单
+                send_execute_mc(f'whitelist add {command[1]}')
                 if config.main_server:
-                    return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
+                    return f'[CQ:at,qq={send_id}] 已在服务器成功绑定并为你自动获取白名单'
+            else:
+                send_execute_mc(f'whitelist reload')
+                if config.main_server:
+                    return f'[CQ:at,qq={send_id}] 已在服务器成功绑定{config.why_no_whitelist}'
+                elif not config.main_server and config.why_no_whitelist != "":
+                    return f'[CQ:at,qq={send_id}] {config.why_no_whitelist}'
+            if config.main_server:
+                return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
     elif command[0] == 'bound' and len(command) != 2:
         return '错误的格式，请使用 #bound <ID>'
 
@@ -437,7 +482,7 @@ def get_diff_list(set1: list, set2: list):
     return None
 
 
-# 整合获取数据
+# 整合获取用户
 def get_user_list():
     if config.mysql_enable:
         return dict(connect_and_query_db("qq_id,player_id", "user_list", config.mysql_config))
@@ -445,7 +490,16 @@ def get_user_list():
         return data
 
 
-# 整合发送数据
+# 整合删除用户
+def delete_user(send_id: str):
+    if config.mysql_enable:
+        connect_and_delete_data("user_list", f"qq_id = {send_id}", config.mysql_config)
+    else:
+        del data[send_id]
+        save_data(__mcdr_server)
+
+
+# 整合绑定用户
 def send_user_list(send_id: str, name: str):
     if config.mysql_enable:
         if config.main_server:

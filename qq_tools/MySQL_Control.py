@@ -38,7 +38,6 @@ def connect_and_insert_db(list_name: str, table_name: str, data: tuple, db_confi
         # 示例查询
         count_data = "%s," * list_name.count(",") + "%s"
         query = f"INSERT INTO {table_name} ({list_name}) VALUES ({count_data});"
-        print(query)
         cursor.execute(query, data)
         # 提交操作
         conn.commit()
