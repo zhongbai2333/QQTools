@@ -491,7 +491,8 @@ def pares_group_command(send_id: str, command: str):
             else:
                 return f'[CQ:at,qq={send_id}] 玩家名不存在！'
     elif command[0] == 'bound' and len(command) != 2:
-        return '错误的格式，请使用 #bound <ID>'
+        if config.main_server:  # 确认是否需要回复
+            return '错误的格式，请使用 #bound <ID>'
 
     # tomcdr 命令
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
@@ -509,7 +510,8 @@ def pares_group_command(send_id: str, command: str):
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
-        return '错误的格式，请使用 #tomcdr <command>'
+        if config.main_server:  # 确认是否需要回复
+            return '错误的格式，请使用 #tomcdr <command>'
 
     # togame 命令
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
