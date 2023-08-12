@@ -1,7 +1,7 @@
 {
   "id": "qq_tools",
-  "version": "0.0.1",
-  "name": "QQChat",
+  "version": "0.1.0",
+  "name": "QQTools",
   "description": {
     "en_us": "Useful Tools with QQ",
     "zh_cn": "QQ 与 服务器 的实用工具"
