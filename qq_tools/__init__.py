@@ -91,8 +91,7 @@ def initialize_help_info():
     admin_help_private_info = f'''{config.server_name}·私聊·帮助菜单·管理特供
     #help 获取本条信息
     #list 获取在线玩家列表
-    #bound bound帮助列表
-    #unbound 删除绑定
+    #bound 绑定相关帮助列表
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
@@ -100,7 +99,6 @@ def initialize_help_info():
     #bound list 查看绑定列表
     #bound check <qq/player> <ID> 查询绑定信息
     #bound unbound <qq/player> <ID> 解除绑定
-    #bound <qq number> <ID> 绑定新ID
 --(๑•̀ㅂ•́)و✧--'''
 
 
@@ -302,7 +300,7 @@ def on_user_info(server: PluginServerInterface, info):
 # -------------------------
 
 
-# 命令转发到QQ
+# 手动命令转发到QQ
 def command_qq(src, ctx):
     player = src.player if src.is_player else 'Console'
     for i in config.groups:
@@ -386,11 +384,38 @@ def pares_private_command(send_id: str, command: str):
                 f"玩家列表: {', '.join(online_players)}"
 
     # bound 命令
-    elif command[0] == 'bound' and (len(command) > 1 or len(command) < 4):
-        # unbound 命令
-        if command[1] == 'unbound' and len(command) == 3:
-            if send_id in str(config.admins):
-                user_list = get_user_list()
+    elif command[0] == 'bound' and 1 < len(command) < 5:
+        if send_id in str(config.admins):
+            user_list = get_user_list()
+            # list 命令
+            if command[1] == 'list' and len(command) == 2:
+                bound_list = [f'{a} - {b}' for a, b in user_list.items()]
+                reply_msg = ''
+                for i in range(0, len(bound_list)):
+                    reply_msg += f'{i + 1}. {bound_list[i]}\n'
+                reply_msg = '还没有人在生存服绑定' if reply_msg == '' else reply_msg
+                return reply_msg
+            elif command[1] == 'list' and len(command) != 2:
+                return '错误的格式，请使用 #bound list'
+            # check 命令
+            elif command[1] == 'check' and len(command) == 4:
+                if command[2] == 'qq':
+                    if command[3] in user_list.keys():
+                        return f'已为您查询到： {user_list[command[3]]}({command[3]})'
+                    else:
+                        return f'无法查询到此人！（{command[3]}）'
+                elif command[2] == 'player':
+                    if command[3] in user_list.values():
+                        player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[3])]
+                        return f'已为您查询到： {command[3]}({player_id_qq})'
+                    else:
+                        return f'无法查询到此人！（{command[3]}）'
+                else:
+                    return '错误的格式，请使用 #bound check <qq/player> <ID>'
+            elif command[1] == 'check' and len(command) != 4:
+                return '错误的格式，请使用 #bound check <qq/player> <ID>'
+            # unbound 命令
+            elif command[1] == 'unbound' and len(command) == 4:
                 if command[2] == 'qq':
                     if command[3] in user_list.keys():
                         if config.whitelist_add_with_bound:
@@ -406,7 +431,7 @@ def pares_private_command(send_id: str, command: str):
                         return f'未找到该玩家，该玩家不存在或未绑定！({command[3]})'
                 if command[2] == 'player':
                     if command[3] in user_list.values():
-                        player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[2])]
+                        player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[3])]
                         if config.whitelist_add_with_bound:
                             send_execute_mc(f'whitelist remove {command[3]}')
                             delete_user(player_id_qq)
@@ -416,11 +441,13 @@ def pares_private_command(send_id: str, command: str):
                             return f'已删除 {command[3]}({player_id_qq}) 的绑定'
                     else:
                         return f'未找到该玩家，该玩家不存在或未绑定！({command[3]})'
-            else:
-                return '抱歉您不是管理员，无权使用该命令！'
-        elif command[1] == 'unbound' and len(command) != 4:
-            return '错误的格式，请使用 #bound unbound qq/player <QQ>'
-    elif command[0] == 'bound' and not (len(command) > 1 or len(command) < 4):
+                else:
+                    return '错误的格式，请使用 #bound unbound <qq/player> <ID>'
+            elif command[1] == 'unbound' and len(command) != 4:
+                return '错误的格式，请使用 #bound unbound <qq/player> <ID>'
+        else:
+            return '抱歉您不是管理员，无权使用该命令！'
+    elif command[0] == 'bound' and not 1 < len(command) < 5:
         return bound_help
 
     # tomcdr 命令
@@ -449,6 +476,10 @@ def pares_private_command(send_id: str, command: str):
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
         return '错误的格式，请使用 #tomcdr <command>'
+
+    # 未知命令
+    else:
+        return '错误的命令，请使用 #help 获取帮助！'
 
 
 # 群命令处理模块
@@ -565,12 +596,13 @@ def pares_group_command(send_id: str, command: str):
 
 # 发送群聊消息至QQ
 def send_group_qq(gid: int, msg: str):
-    msg = msg.replace('#', '%23')
-    if config.debug:
-        __mcdr_server.logger.info(msg)
-    requests.get(
-        url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port, gid,
-                                                                            msg))
+    if msg:
+        msg = msg.replace('#', '%23')
+        if config.debug:
+            __mcdr_server.logger.info(msg)
+        requests.get(
+            url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port, gid,
+                                                                                msg))
 
 
 # 发送私聊消息至QQ
@@ -639,7 +671,8 @@ def get_user_list():
 # 整合删除用户
 def delete_user(send_id: str):
     if config.mysql_enable:
-        connect_and_delete_data("user_list", f"qq_id = {send_id}", config.mysql_config)
+        if config.main_server:
+            connect_and_delete_data("user_list", f"qq_id = {send_id}", config.mysql_config)
     else:
         del data[send_id]
         save_data(__mcdr_server)
