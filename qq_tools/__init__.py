@@ -10,7 +10,7 @@ from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, co
 from mcdreforged.api.all import *
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
-global debug_json_mode, help_private_info, admin_help_private_info
+global debug_json_mode, help_private_info, admin_help_private_info, bound_help
 __mcdr_server: PluginServerInterface
 data: dict
 try:  # 试图导入mysql处理
@@ -56,7 +56,7 @@ class Config(Serializable):
 
 # 初始化帮助信息
 def initialize_help_info():
-    global help_info, admin_help_info, help_private_info, admin_help_private_info
+    global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help
     if config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
@@ -91,9 +91,16 @@ def initialize_help_info():
     admin_help_private_info = f'''{config.server_name}·私聊·帮助菜单·管理特供
     #help 获取本条信息
     #list 获取在线玩家列表
+    #bound bound帮助列表
     #unbound 删除绑定
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+--(๑•̀ㅂ•́)و✧--'''
+    bound_help = f'''{config.server_name}·私聊·帮助菜单·bound
+    #bound list 查看绑定列表
+    #bound check <qq/player> <ID> 查询绑定信息
+    #bound unbound <qq/player> <ID> 解除绑定
+    #bound <qq number> <ID> 绑定新ID
 --(๑•̀ㅂ•́)و✧--'''
 
 
@@ -378,39 +385,43 @@ def pares_private_command(send_id: str, command: str):
         return f"{config.server_name} 在线玩家共{len(online_players)}人，" \
                 f"玩家列表: {', '.join(online_players)}"
 
-    # unbound 命令
-    elif command[0] == 'unbound' and len(command) == 3:
-        if send_id in str(config.admins):
-            user_list = get_user_list()
-            if command[1] == 'qq':
-                if command[2] in user_list.keys():
-                    if config.whitelist_add_with_bound:
-                        player_name = user_list[command[2]]
-                        send_execute_mc(f'whitelist remove {player_name}')
-                        delete_user(command[2])
-                        return f'已删除 {player_name}({command[2]}) 的绑定并自动解除了白名单'
+    # bound 命令
+    elif command[0] == 'bound' and (len(command) > 1 or len(command) < 4):
+        # unbound 命令
+        if command[1] == 'unbound' and len(command) == 3:
+            if send_id in str(config.admins):
+                user_list = get_user_list()
+                if command[2] == 'qq':
+                    if command[3] in user_list.keys():
+                        if config.whitelist_add_with_bound:
+                            player_name = user_list[command[3]]
+                            send_execute_mc(f'whitelist remove {player_name}')
+                            delete_user(command[3])
+                            return f'已删除 {player_name}({command[3]}) 的绑定并自动解除了白名单'
+                        else:
+                            player_name = user_list[command[3]]
+                            delete_user(command[3])
+                            return f'已删除 {player_name}({command[3]}) 的绑定'
                     else:
-                        player_name = user_list[command[2]]
-                        delete_user(command[2])
-                        return f'已删除 {player_name}({command[2]}) 的绑定'
-                else:
-                    return f'未找到该玩家，该玩家不存在或未绑定！({command[2]})'
-            if command[1] == 'player':
-                if command[2] in user_list.values():
-                    player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[2])]
-                    if config.whitelist_add_with_bound:
-                        send_execute_mc(f'whitelist remove {command[2]}')
-                        delete_user(player_id_qq)
-                        return f'已删除 {command[2]}({player_id_qq}) 的绑定并自动解除了白名单'
+                        return f'未找到该玩家，该玩家不存在或未绑定！({command[3]})'
+                if command[2] == 'player':
+                    if command[3] in user_list.values():
+                        player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[2])]
+                        if config.whitelist_add_with_bound:
+                            send_execute_mc(f'whitelist remove {command[3]}')
+                            delete_user(player_id_qq)
+                            return f'已删除 {command[3]}({player_id_qq}) 的绑定并自动解除了白名单'
+                        else:
+                            delete_user(player_id_qq)
+                            return f'已删除 {command[3]}({player_id_qq}) 的绑定'
                     else:
-                        delete_user(player_id_qq)
-                        return f'已删除 {command[2]}({player_id_qq}) 的绑定'
-                else:
-                    return f'未找到该玩家，该玩家不存在或未绑定！({command[2]})'
-        else:
-            return '抱歉您不是管理员，无权使用该命令！'
-    elif command[0] == 'unbound' and len(command) != 3:
-        return '错误的格式，请使用 #unbound qq/player <QQ>'
+                        return f'未找到该玩家，该玩家不存在或未绑定！({command[3]})'
+            else:
+                return '抱歉您不是管理员，无权使用该命令！'
+        elif command[1] == 'unbound' and len(command) != 4:
+            return '错误的格式，请使用 #bound unbound qq/player <QQ>'
+    elif command[0] == 'bound' and not (len(command) > 1 or len(command) < 4):
+        return bound_help
 
     # tomcdr 命令
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
