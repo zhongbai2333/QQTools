@@ -327,7 +327,7 @@ def parse_msg(get_json):
             user_list = get_user_list()
             if str(get_json['user_id']) in user_list.keys():  # 检测是否绑定
                 __mcdr_server.say(f"§7[QQ][{user_list[send_id]}] {msg}")  # 转发消息
-            elif not str(get_json['user_id']) in data.keys() and config.main_server:
+            elif not str(get_json['user_id']) in user_list.keys() and config.main_server:
                 send_group_qq(get_json['group_id'],
                               f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID")
     elif get_json['message_type'] == 'private':  # 处理私聊消息
