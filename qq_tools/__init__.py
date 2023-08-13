@@ -50,18 +50,18 @@ def initialize_help_info():
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
     #debug 临时开启或关闭debug模式
 --(๑•̀ㅂ•́)و✧--'''
-    help_private_info = f'''{config.server_name}·私聊·帮助菜单
+    help_private_info = '''私聊·帮助菜单
     #help 获取本条信息
     #list 获取在线玩家列表
 --(๑•̀ㅂ•́)و✧--'''
-    admin_help_private_info = f'''{config.server_name}·私聊·帮助菜单·管理特供
+    admin_help_private_info = f'''私聊·帮助菜单·管理特供
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound 绑定相关帮助列表
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
-    bound_help = f'''{config.server_name}·私聊·帮助菜单·bound
+    bound_help = '''私聊·帮助菜单·bound
     #bound list 查看绑定列表
     #bound check <qq/player> <ID> 查询绑定信息
     #bound unbound <qq/player> <ID> 解除绑定
@@ -593,6 +593,7 @@ def send_group_qq(gid: int, msg: str):
 # 发送私聊消息至QQ
 def send_private_qq(uid: int, msg: str):
     msg = msg.replace('#', '%23')
+    msg = f"{config.server_name}·" + msg
     if debug_status:
         __mcdr_server.logger.info(msg)
     requests.get(
