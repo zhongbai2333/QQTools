@@ -172,11 +172,11 @@ def on_load(server: PluginServerInterface, _):
         debug_status
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
+    debug_status = config.debug
     initialize_help_info()
     wait_list = []
     online_players = []
     debug_json_mode = 0
-    debug_status = config.debug
 
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
