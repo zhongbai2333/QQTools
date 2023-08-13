@@ -707,6 +707,7 @@ def send_user_list(send_id: str, name: str):
                 db_data = (send_id, name)
                 connect_and_insert_db("qq_id,player_id", "user_list", db_data, config.mysql_config)
                 return True
+            return True
         else:
             data[send_id] = name  # 进行绑定
             save_data(__mcdr_server)
