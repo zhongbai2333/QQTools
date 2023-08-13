@@ -2,13 +2,13 @@ import json
 import re
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import List, Dict
 
 import requests
 from mcdreforged.api.all import *
 
 from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
                             connect_and_delete_data)
+from .config import Config
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status
@@ -20,42 +20,6 @@ except ImportError:
     mysql = None
 
 
-class Config(Serializable):
-    send_host: str = "127.0.0.1"
-    send_port: int = 5700
-    post_host: str = "0.0.0.0"
-    post_port: int = 5701
-    groups: List[int] = [11111111, 22222222]
-    admins: List[int] = [11111111, 22222222]
-    server_name: str = "Survival Server"
-    main_server: bool = True
-    whitelist_add_with_bound: bool = True
-    why_no_whitelist: str = ""
-    whitelist_path: str = "./server/whitelist.json"
-    whitelist_remove_with_leave: bool = True
-    forwards_mcdr_command: bool = True
-    forwards_server_start_and_stop: bool = True
-    debug: bool = False
-    online_mode: bool = True
-    auto_forwards: Dict[str, bool] = {
-        'mc_to_qq': False,
-        'qq_to_mc': False
-    }
-    mysql_enable: bool = False
-    mysql_config: Dict[str, str] = {
-        'host': "127.0.0.1",
-        'port': "3306",
-        'database': "MCDR_QQTools",
-        'user': "root",
-        'password': "123"
-    }
-    admin_commands: Dict[str, str] = {
-        'to_mcdr': "tomcdr",
-        'to_minecraft': "togame"
-    }
-
-
-# 初始化帮助信息
 def initialize_help_info():
     global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help
     if config.auto_forwards['qq_to_mc']:
@@ -73,7 +37,7 @@ def initialize_help_info():
     #admin_help 管理员帮助菜单
     : <msg> 转发消息至游戏
 --(๑•̀ㅂ•́)و✧--'''
-    if debug_status:
+    if config.debug:
         admin_help_info = f'''{config.server_name}·管理员·帮助菜单
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令

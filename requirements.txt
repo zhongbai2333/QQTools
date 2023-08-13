@@ -1,3 +1,2 @@
 requests
-mysql-connector-python
 mcdreforged>=2.0.0b3
