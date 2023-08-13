@@ -1,16 +1,17 @@
-from typing import List, Dict
-
 import json
 import re
-import requests
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
-                            connect_and_delete_data)
+from typing import List, Dict
+
+import requests
 from mcdreforged.api.all import *
 
+from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
+                            connect_and_delete_data)
+
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
-global debug_json_mode, help_private_info, admin_help_private_info, bound_help
+global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status
 __mcdr_server: PluginServerInterface
 data: dict
 try:  # 试图导入mysql处理
@@ -72,17 +73,18 @@ def initialize_help_info():
     #admin_help 管理员帮助菜单
     : <msg> 转发消息至游戏
 --(๑•̀ㅂ•́)و✧--'''
-    if config.debug:
-        admin_help_info = f'''管理员·帮助菜单
+    if debug_status:
+        admin_help_info = f'''{config.server_name}·管理员·帮助菜单
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
-    #debug_json <all/no_heart/stop> 测试Json数据包
-    #debug 开发通用触发器
+    #debug 临时开启或关闭debug模式
+    #debug_json 测试Json数据包
 --(๑•̀ㅂ•́)و✧--'''
     else:
-        admin_help_info = f'''管理员·帮助菜单
+        admin_help_info = f'''{config.server_name}·管理员·帮助菜单
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+    #debug 临时开启或关闭debug模式
 --(๑•̀ㅂ•́)و✧--'''
     help_private_info = f'''{config.server_name}·私聊·帮助菜单
     #help 获取本条信息
@@ -165,14 +167,16 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 # -------------------------
 
 
-def on_load(server: PluginServerInterface, prev_module):
-    global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode
+def on_load(server: PluginServerInterface, _):
+    global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
+        debug_status
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     initialize_help_info()
     wait_list = []
     online_players = []
     debug_json_mode = 0
+    debug_status = config.debug
 
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
@@ -205,16 +209,17 @@ def on_load(server: PluginServerInterface, prev_module):
         __mcdr_server.logger.info("QQTools无法启动，请安装mysql-connector-python或关闭数据库功能！")
 
 
-def on_server_startup(server: PluginServerInterface):
+def on_server_startup(_):
     global server_status
     server_status = True
     if wait_list:  # 服务器核心重启后处理堆积命令
         for i in wait_list:
             send_execute_mc(i)
+            time.sleep(0.5)
     if config.mysql_enable and config.whitelist_add_with_bound:
         db_player_list = connect_and_query_db("player_id", "user_list", config.mysql_config)
         result_list = [element for tup in db_player_list for element in tup]
-        if config.debug:
+        if debug_status:
             __mcdr_server.logger.info(f"UserList: {result_list}")
             __mcdr_server.logger.info(f"WhiteList: {get_whitelist()}")
         diff_player = get_diff_list(  # 检查数据库有没有新的玩家
@@ -244,7 +249,7 @@ def on_server_startup(server: PluginServerInterface):
             send_group_qq(i, msg_start)
 
 
-def on_server_stop(server: PluginServerInterface, server_return_code: int):
+def on_server_stop(_, __):
     global server_status
     server_status = False
     if config.forwards_server_start_and_stop:
@@ -253,13 +258,13 @@ def on_server_stop(server: PluginServerInterface, server_return_code: int):
             send_group_qq(i, msg_stop)
 
 
-def on_unload(server: PluginServerInterface):
+def on_unload(_):
     __mcdr_server.logger.info("Http server stopping now...")
     time.sleep(0.5)
 
 
 # 在线玩家检测
-def on_player_joined(server, player, info):
+def on_player_joined(_, player, __):
     if player not in online_players:
         online_players.append(player)
     if config.auto_forwards['mc_to_qq']:
@@ -273,7 +278,7 @@ def on_player_joined(server, player, info):
         __mcdr_server.tell(player, "QQTools提醒您，服务器已启用手动转发MC消息！")
 
 
-def on_player_left(server, player):
+def on_player_left(_, player):
     if player in online_players:
         online_players.remove(player)
     if config.auto_forwards['mc_to_qq']:
@@ -282,7 +287,7 @@ def on_player_left(server, player):
 
 
 # 自动转发到QQ
-def on_user_info(server: PluginServerInterface, info):
+def on_user_info(_, info):
     if info.is_player and config.auto_forwards['mc_to_qq']:
         msg = info.content
         if config.forwards_mcdr_command:
@@ -380,7 +385,7 @@ def pares_private_command(send_id: str, command: str):
     # list 命令
     elif command[0] == 'list':
         return f"{config.server_name} 在线玩家共{len(online_players)}人，" \
-                f"玩家列表: {', '.join(online_players)}"
+               f"玩家列表: {', '.join(online_players)}"
 
     # bound 命令
     elif command[0] == 'bound' and 1 < len(command) < 5:
@@ -483,6 +488,7 @@ def pares_private_command(send_id: str, command: str):
 
 # 群命令处理模块
 def pares_group_command(send_id: str, command: str):
+    global debug_status
     command = command.split(' ')  # 解析信息为列表
 
     # help 命令
@@ -490,7 +496,7 @@ def pares_group_command(send_id: str, command: str):
         return help_info
 
     # admin_help 命令
-    elif command[0] == 'admin_help' and config.main_server:
+    elif command[0] == 'admin_help':
         if send_id in str(config.admins):
             return admin_help_info
         else:
@@ -498,12 +504,14 @@ def pares_group_command(send_id: str, command: str):
 
     # list 命令
     elif command[0] == 'list':
-        return f"{config.server_name} 在线玩家共{len(online_players)}人，" \
-               f"玩家列表: {', '.join(online_players)}"
+        if server_status:
+            return f"{config.server_name} 在线玩家共{len(online_players)}人\n" \
+                   f"玩家列表: {', '.join(online_players)}"
+        else:
+            return f"{config.server_name} 服务器核心未启动！"
 
     # bound 命令
-    elif command[0] == 'bound' and len(command) == 2 and \
-            not (not config.main_server and config.mysql_enable):  # 检测 bound 命令和格式
+    elif command[0] == 'bound' and len(command) == 2:  # 检测 bound 命令和格式
         user_list = get_user_list()
         if send_id in user_list.keys():  # 检测玩家是否已经绑定
             if config.main_server:  # 确认服务器是否需要回复
@@ -564,10 +572,10 @@ def pares_group_command(send_id: str, command: str):
         return '错误的格式，请使用 #tomcdr <command>'
 
     # debug_json 命令
-    elif command[0] == 'debug_json' and config.debug and send_id in str(config.admins):
+    elif command[0] == 'debug_json' and debug_status and send_id in str(config.admins):
         global debug_json_mode
         if len(command) < 2:
-            return '错误的命令，格式为#debug_json <all/no_heart/stop>'
+            return '错误的格式，请使用 #debug_json <all/no_heart/stop>'
         elif command[1] == "all":
             debug_json_mode = 1
             return 'Json测试开启，模式：全部Json'
@@ -578,14 +586,21 @@ def pares_group_command(send_id: str, command: str):
             debug_json_mode = 0
             return 'Json测试关闭'
         else:
-            return '错误的命令，格式为#debug_json <all/no_heart/stop>'
-    elif command[0] == 'debug_json' and config.debug and send_id not in str(config.admins):
+            return '错误的格式，请使用 #debug_json <all/no_heart/stop>'
+    elif command[0] == 'debug_json' and debug_status and send_id not in str(config.admins):
         return '抱歉您不是管理员，无权使用该命令！'
 
-    # debug 命令 作为测试触发器使用
-    elif command[0] == 'debug' and config.debug and send_id in str(config.admins):
-        return "1\n2\n3"
-    elif command[0] == 'debug' and config.debug and send_id not in str(config.admins):
+    # debug 命令
+    elif command[0] == 'debug' and send_id in str(config.admins):
+        if command[1] == 'on':
+            debug_status = True
+            return 'debug已开启！'
+        elif command[1] == 'off':
+            debug_status = False
+            return 'debug已关闭！'
+        else:
+            return '错误的格式，请使用 #debug <on/off>'
+    elif command[0] == 'debug' and send_id not in str(config.admins):
         return '抱歉您不是管理员，无权使用该命令！'
 
     # 未知命令
@@ -598,7 +613,7 @@ def pares_group_command(send_id: str, command: str):
 def send_group_qq(gid: int, msg: str):
     if msg:
         msg = msg.replace('#', '%23')
-        if config.debug:
+        if debug_status:
             __mcdr_server.logger.info(msg)
         requests.get(
             url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port, gid,
@@ -608,7 +623,7 @@ def send_group_qq(gid: int, msg: str):
 # 发送私聊消息至QQ
 def send_private_qq(uid: int, msg: str):
     msg = msg.replace('#', '%23')
-    if config.debug:
+    if debug_status:
         __mcdr_server.logger.info(msg)
     requests.get(
         url='http://{0}:{1}/send_private_msg?user_id={2}&message={3}'.format(config.send_host, config.send_port, uid,
@@ -619,8 +634,10 @@ def send_private_qq(uid: int, msg: str):
 def send_execute_mc(command: str):
     if server_status:  # 确认服务器是否启动
         __mcdr_server.execute(command)
+        __mcdr_server.logger.info(f"QQTools execute:{command}")
     else:
         wait_list.append(command)  # 堆着等开服
+        __mcdr_server.logger.info(f"Can't execute:{command}\nThe list of commands:{str(wait_list)}")
 
 
 # RCON相关
