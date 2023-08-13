@@ -230,6 +230,7 @@ def on_server_startup(_):
             for i in diff_player:
                 __mcdr_server.logger.info(f"New Player! Name:{i}")
                 send_execute_mc(f'whitelist add {i}')  # 加一下新玩家
+                time.sleep(0.5)
 
         diff_player = get_diff_list(  # 检查数据库有没有老的玩家
             get_whitelist(),
@@ -239,6 +240,7 @@ def on_server_startup(_):
             for i in diff_player:
                 __mcdr_server.logger.info(f"Wrong Player! Name:{i}")
                 send_execute_mc(f'whitelist remove {i}')  # 删一下老玩家
+                time.sleep(0.5)
 
     if config.forwards_server_start_and_stop:
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
@@ -674,7 +676,8 @@ def get_diff_list(set1: list, set2: list):
         set2 = set(set2)
         diff = set1 - set2
         return list(diff)
-    return None
+    else:
+        return set1
 
 
 # 整合获取用户
