@@ -21,7 +21,7 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 | `server_name` | 服务器名 | `'Survival Server'` | 发送到qq时会加上server_name的前缀 |
 | `main_server` | 是否为主服务器 | `true` | 关乎于大量命令是否会有回复 |
 | `whitelist_add_with_bound` | 群成员绑定游戏 id 时自动添加白名单 | `true` | 关闭的时候可以写理由 |
-| `why_no_whitelist` | 为什么服务器不会自动加白名单 | `` | 如果空着就不会有任何提示 |
+| `why_no_whitelist` | 为什么服务器不会自动加白名单 | `空` | 如果空着就不会有任何提示 |
 | `whitelist_path` | 白名单的位置 | `./server/whitelist.json` | 如果你的server不叫server就改一个吧 |
 | `whitelist_remove_with_leave` | 退群自动解绑 | `true` | 白名单和绑定都受此影响 |
 | `forwards_mcdr_command` | 自动转发服务器信息的时候是否过滤MCDR命令 | `False` | 建议关了，挺危险的 |
