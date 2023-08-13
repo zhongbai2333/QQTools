@@ -5,6 +5,10 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
 from mcdreforged.api.all import *
+try:  # 试图导入mysql处理
+    import mysql.connector
+except ImportError:
+    mysql = None
 
 from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
                             connect_and_delete_data)
@@ -14,10 +18,6 @@ global httpd, config, data, help_info, online_players, admin_help_info, answer, 
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status
 __mcdr_server: PluginServerInterface
 data: dict
-try:  # 试图导入mysql处理
-    import mysql.connector
-except ImportError:
-    mysql = None
 
 
 def initialize_help_info():
