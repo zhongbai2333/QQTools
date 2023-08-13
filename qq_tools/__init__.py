@@ -343,7 +343,8 @@ def parse_msg(get_json):
         if msg[0] == '#':  # 分辨命令消息
             send_private_qq(get_json['user_id'], pares_private_command(send_id, msg[1:]))  # 调用命令处理模块并返回消息
         else:
-            send_private_qq(get_json['user_id'], "你有什么事嘛^_^")
+            if config.main_server:
+                send_private_qq(get_json['user_id'], "你有什么事嘛^_^")
 
 
 # 进出群处理
@@ -351,11 +352,14 @@ def join_and_leave_group(get_json):
     send_id = str(get_json['user_id'])
     if get_json['notice_type'] == 'group_increase':  # 进群处理
         if config.auto_forwards['qq_to_mc']:  # 是否已开启自动转发
-            send_group_qq(get_json['group_id'],
-                          f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器将自动把群消息同步至服务器聊天栏")
+            if config.main_server:
+                send_group_qq(get_json['group_id'],
+                              f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器将自动把群消息同步至服务器聊天栏")
         else:
-            send_group_qq(get_json['group_id'],
-                          f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器需使用命令: <msg>把群消息同步至服务器聊天栏")
+            if config.main_server:
+                send_group_qq(get_json['group_id'],
+                              f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器需使用命令: "
+                              f"<msg>把群消息同步至服务器聊天栏")
     elif get_json['notice_type'] == 'group_decrease':  # 退群处理
         user_list = get_user_list()
         if config.whitelist_remove_with_leave:  # 是否自动删除白名单
