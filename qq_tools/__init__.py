@@ -254,7 +254,6 @@ def on_server_stop(server: PluginServerInterface, server_return_code: int):
 
 
 def on_unload(server: PluginServerInterface):
-    httpd.server_close()
     __mcdr_server.logger.info("Http server stopping now...")
     time.sleep(0.5)
 
