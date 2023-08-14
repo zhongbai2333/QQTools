@@ -608,7 +608,7 @@ def send_execute_mc(command: str):
         __mcdr_server.logger.info(f"QQTools execute:{command}")
     else:
         wait_list.append(command)  # 堆着等开服
-        __mcdr_server.logger.info(f"Can't execute:{command}\nThe list of commands:{str(wait_list)}")
+        __mcdr_server.logger.info(f"QQTools can't execute:{command}, The list of commands:{str(wait_list)}")
 
 
 # RCON相关
