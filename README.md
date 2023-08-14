@@ -34,6 +34,7 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 | `mysql_config` | MySQL的设置 | `略` | 数据库的权限必须分配给这个用户</br>**不要使用root用户，危险！** |
 | `to_mcdr` | 设置 执行MCDR命令功能 的命令名称 | `tomcdr` | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
 | `to_minecraft` | 设置 执行RCON命令功能 的命令名称 | `togame` | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
+| `whitelist` | 设置 白名单控制功能 的命令名称 | `whitelist` | 私聊`#help`内会自动修改，群组服建议使用不同的命令 |
 
 
 ## 命令帮助
@@ -54,9 +55,9 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 
 `#admin_help` 获取管理员信息
 
-`#【自定义】（配置文件内的"to_mcdr"选项）` 使用MCDR命令(**默认为`tomcdr`**)
+`#[自定义]（配置文件内的"to_mcdr"选项）` 使用MCDR命令(**默认为`tomcdr`**)
 
-`#【自定义】（配置文件内的"to_minecraft"选项）` 使用Minecraft命令(**默认为`togame`**)
+`#[自定义]（配置文件内的"to_minecraft"选项）` 使用Minecraft命令(**默认为`togame`**)
 
 `#debug <on/off>` 临时开启或关闭debug模式
 
@@ -68,6 +69,10 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
     
 `#list` 获取在线玩家列表
 
+`#bound` 绑定相关帮助列表
+
+`#[自定义]（配置文件内的"whitelist"选项）` 白名单相关帮助列表(**默认为`whitelist`**)
+
 > 管理员私聊命令帮助如下(**仅管理员可见\可用**)
 
 `#help` 获取本条信息
@@ -76,16 +81,38 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 
 `#bound` 绑定相关帮助列表
 
-`#【自定义】（配置文件内的"to_mcdr"选项）` 使用MCDR命令(**默认为`tomcdr`**)
+`#bound` 绑定相关帮助列表
 
-`#【自定义】（配置文件内的"to_minecraft"选项）` 使用Minecraft命令(**默认为`togame`**)
+`#[自定义]（配置文件内的"whitelist"选项）` 白名单相关帮助列表(**默认为`whitelist`**)
 
-> bound 私聊命令帮助如下(**仅管理员可见\可用**)
+`#[自定义]（配置文件内的"to_mcdr"选项）` 使用MCDR命令(**默认为`tomcdr`**)
+
+`#[自定义]（配置文件内的"to_minecraft"选项）` 使用Minecraft命令(**默认为`togame`**)
+
+> bound 普通私聊命令帮助如下
+
+`#bound check <qq/player> <ID>` 查询绑定信息
+
+> bound 管理员私聊命令帮助如下(**仅管理员可见\可用**)
 
 `#bound list` 查看绑定列表
 
 `#bound check <qq/player> <ID>` 查询绑定信息
 
 `#bound unbound <qq/player> <ID>` 解除绑定
+
+> whitelist 普通私聊命令帮助如下（默认配置文件内的`"whitelist"`选项为`"whitelist"`）
+
+`#whitelist check <player ID>` 查询白名单信息
+
+> whitelist 管理员私聊命令帮助如下(默认配置文件内的`"whitelist"`选项为`"whitelist"`，**仅管理员可见\可用**)
+
+`#whitelist add <player ID>` 添加白名单
+
+`#whitelist remove <player ID>` 删除白名单
+
+`#whitelist list` 列出白名单
+
+`#whitelist check <player ID>` 查询白名单信息 
 
 懒得写英语了哈哈哈(๑•̀ㅂ•́)و✧
