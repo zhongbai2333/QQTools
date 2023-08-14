@@ -35,5 +35,6 @@ class Config(Serializable):
     }
     admin_commands: Dict[str, str] = {
         'to_mcdr': "tomcdr",
-        'to_minecraft': "togame"
+        'to_minecraft': "togame",
+        'whitelist': "whitelist"
     }

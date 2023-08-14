@@ -15,13 +15,15 @@ from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, co
 from .config import Config
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
-global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status
+global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
+global whitelist_help, admin_whitelist_help
 __mcdr_server: PluginServerInterface
 data: dict
 
 
 def initialize_help_info():
-    global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help
+    global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help, admin_bound_help
+    global whitelist_help, admin_whitelist_help
     if config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
@@ -50,21 +52,36 @@ def initialize_help_info():
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
     #debug 临时开启或关闭debug模式
 --(๑•̀ㅂ•́)و✧--'''
-    help_private_info = '''私聊·帮助菜单
+    help_private_info = f'''私聊·帮助菜单
     #help 获取本条信息
     #list 获取在线玩家列表
+    #bound 绑定相关帮助列表
+    #{config.admin_commands['whitelist']} 白名单相关帮助列表
 --(๑•̀ㅂ•́)و✧--'''
     admin_help_private_info = f'''私聊·帮助菜单·管理特供
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound 绑定相关帮助列表
+    #{config.admin_commands['whitelist']} 白名单相关帮助列表
     #{config.admin_commands['to_mcdr']} 使用MCDR命令
     #{config.admin_commands['to_minecraft']} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
-    bound_help = '''私聊·帮助菜单·bound
+    admin_bound_help = '''私聊·帮助菜单·bound
     #bound list 查看绑定列表
     #bound check <qq/player> <ID> 查询绑定信息
     #bound unbound <qq/player> <ID> 解除绑定
+--(๑•̀ㅂ•́)و✧--'''
+    bound_help = '''私聊·帮助菜单·bound
+    #bound check <qq/player> <ID> 查询绑定信息
+--(๑•̀ㅂ•́)و✧--'''
+    whitelist_help = f'''私聊·帮助菜单·{config.admin_commands['whitelist']}
+    #{config.admin_commands['whitelist']} check <player ID> 查询白名单信息
+--(๑•̀ㅂ•́)و✧--'''
+    admin_whitelist_help = f'''私聊·帮助菜单·{config.admin_commands['whitelist']}
+    #{config.admin_commands['whitelist']} add <player ID> 添加白名单
+    #{config.admin_commands['whitelist']} remove <player ID> 删除白名单
+    #{config.admin_commands['whitelist']} list 列出白名单
+    #{config.admin_commands['whitelist']} check <player ID> 查询白名单信息
 --(๑•̀ㅂ•́)و✧--'''
 
 
@@ -359,36 +376,19 @@ def pares_private_command(send_id: str, command: str):
 
     # bound 命令
     elif command[0] == 'bound' and 1 < len(command) < 5:
+        user_list = get_user_list()
         if send_id in str(config.admins):
-            user_list = get_user_list()
             # list 命令
             if command[1] == 'list' and len(command) == 2:
                 bound_list = [f'{a} - {b}' for a, b in user_list.items()]
-                reply_msg = ''
+                reply_msg = '绑定列表：\n'
                 for i in range(0, len(bound_list)):
                     reply_msg += f'{i + 1}. {bound_list[i]}\n'
                 reply_msg = '还没有人在生存服绑定' if reply_msg == '' else reply_msg
                 return reply_msg
             elif command[1] == 'list' and len(command) != 2:
                 return '错误的格式，请使用 #bound list'
-            # check 命令
-            elif command[1] == 'check' and len(command) == 4:
-                if command[2] == 'qq':
-                    if command[3] in user_list.keys():
-                        return f'已为您查询到： {user_list[command[3]]}({command[3]})'
-                    else:
-                        return f'无法查询到此人！（{command[3]}）'
-                elif command[2] == 'player':
-                    if command[3] in user_list.values():
-                        player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[3])]
-                        return f'已为您查询到： {command[3]}({player_id_qq})'
-                    else:
-                        return f'无法查询到此人！（{command[3]}）'
-                else:
-                    return '错误的格式，请使用 #bound check <qq/player> <ID>'
-            elif command[1] == 'check' and len(command) != 4:
-                return '错误的格式，请使用 #bound check <qq/player> <ID>'
-            # unbound 命令
+                # unbound 命令
             elif command[1] == 'unbound' and len(command) == 4:
                 if command[2] == 'qq':
                     if command[3] in user_list.keys():
@@ -421,8 +421,98 @@ def pares_private_command(send_id: str, command: str):
                 return '错误的格式，请使用 #bound unbound <qq/player> <ID>'
         else:
             return '抱歉您不是管理员，无权使用该命令！'
+        # check 命令
+        if command[1] == 'check' and len(command) == 4:
+            if command[2] == 'qq':
+                if command[3] in user_list.keys():
+                    return f'已为您查询到： {user_list[command[3]]}({command[3]})'
+                else:
+                    return f'无法查询到此人！（{command[3]}）'
+            elif command[2] == 'player':
+                if command[3] in user_list.values():
+                    player_id_qq = list(user_list.keys())[list(user_list.values()).index(command[3])]
+                    return f'已为您查询到： {command[3]}({player_id_qq})'
+                else:
+                    return f'无法查询到此人！（{command[3]}）'
+            else:
+                return '错误的格式，请使用 #bound check <qq/player> <ID>'
+        elif command[1] == 'check' and len(command) != 4:
+            return '错误的格式，请使用 #bound check <qq/player> <ID>'
     elif command[0] == 'bound' and not 1 < len(command) < 5:
-        return bound_help
+        if send_id in str(config.admins):
+            return admin_bound_help
+        else:
+            return bound_help
+
+    # whitelist 命令
+    elif command[0] == config.admin_commands['whitelist'] and 1 < len(command) < 4:
+        white_list = get_whitelist()
+        if send_id in str(config.admins):
+            # add 命令
+            if command[1] == 'add' and len(command) == 3:
+                pattern = r'[^a-zA-Z0-9_]'
+                if config.online_mode and real_name(command[2]):
+                    if command[2] in white_list:
+                        return f'{command[2]} 已有白名单！'
+                    else:
+                        send_execute_mc(f"whitelist add {command[2]}")
+                        return f'已成功为 {command[2]} 添加白名单！'
+                elif not config.online_mode and not re.search(pattern, command[2]):
+                    if command[2] in white_list:
+                        return f'{command[2]} 已有白名单！'
+                    else:
+                        send_execute_mc(f"whitelist add {command[2]}")
+                        return f'已成功为 {command[2]} 添加白名单！'
+                else:
+                    return f'用户名不存在或不合法！（{command[2]}）'
+            elif command[1] == 'add' and len(command) != 3:
+                return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} add <player ID>'
+            # remove 命令
+            elif command[1] == 'remove' and len(command) == 3:
+                pattern = r'[^a-zA-Z0-9_]'
+                if config.online_mode and real_name(command[2]):
+                    if command[2] in white_list:
+                        send_execute_mc(f"whitelist remove {command[2]}")
+                        return f'已成功为 {command[2]} 删除白名单！'
+                    else:
+                        return f'{command[2]} 没有此服务器白名单！'
+                elif not config.online_mode and not re.search(pattern, command[2]):
+                    if command[2] in white_list:
+                        send_execute_mc(f"whitelist remove {command[2]}")
+                        return f'已成功为 {command[2]} 删除白名单！'
+                    else:
+                        return f'{command[2]} 没有此服务器白名单！'
+                else:
+                    return f'用户名不存在或不合法！（{command[2]}）'
+            elif command[1] == 'remove' and len(command) != 3:
+                return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} remove <player ID>'
+            # list 命令
+            elif command[1] == 'list' and len(command) == 2:
+                if white_list:
+                    white_list_show = "白名单列表：\n"
+                    num = 0
+                    for i in white_list:
+                        num += 1
+                        white_list_show = white_list_show + f'{str(num)}. {i}\n'
+                    return f'{white_list_show + "总计: " + str(num)}'
+                else:
+                    return '白名单为空！'
+            elif command[1] == 'list' and len(command) != 2:
+                return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} list'
+        else:
+            return '抱歉您不是管理员，无权使用该命令！'
+        if command[1] == 'check' and len(command) == 3:
+            if command[2] in white_list:
+                return f'{command[2]} 在此服务器白名单！'
+            else:
+                return f'{command[2]} 不在此服务器白名单！'
+        elif command[1] == 'check' and len(command) != 3:
+            return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} check <player ID>'
+    elif command[0] == config.admin_commands['whitelist'] and not 1 < len(command) < 4:
+        if send_id in str(config.admins):
+            return admin_whitelist_help
+        else:
+            return whitelist_help
 
     # tomcdr 命令
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
@@ -440,7 +530,7 @@ def pares_private_command(send_id: str, command: str):
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
-        return '错误的格式，请使用 #tomcdr <command>'
+        return f'错误的格式，请使用 #{config.admin_commands["to_mcdr"]} <command>'
 
     # togame 命令
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
@@ -449,11 +539,7 @@ def pares_private_command(send_id: str, command: str):
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
-        return '错误的格式，请使用 #tomcdr <command>'
-
-    # 未知命令
-    else:
-        return '错误的命令，请使用 #help 获取帮助！'
+        return f'错误的格式，请使用 #{config.admin_commands["to_minecraft"]} <command>'
 
 
 # 群命令处理模块
@@ -530,7 +616,7 @@ def pares_group_command(send_id: str, command: str):
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
         if config.main_server:  # 确认是否需要回复
-            return '错误的格式，请使用 #tomcdr <command>'
+            return f'错误的格式，请使用 #{config.admin_commands["to_mcdr"]} <command>'
 
     # togame 命令
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
@@ -539,7 +625,7 @@ def pares_group_command(send_id: str, command: str):
         else:
             return '抱歉您不是管理员，无权使用该命令！'
     elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
-        return '错误的格式，请使用 #tomcdr <command>'
+        return f'错误的格式，请使用 #{config.admin_commands["to_minecraft"]} <command>'
 
     # debug_json 命令
     elif command[0] == 'debug_json' and debug_status and send_id in str(config.admins):
