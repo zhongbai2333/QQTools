@@ -40,4 +40,4 @@ class Config(Serializable):
         'user': "root",
         'password': "123"
     }
-    admin_commands: Dict[str, str] = AdminCommands()
+    admin_commands: dict = AdminCommands()
