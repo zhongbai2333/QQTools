@@ -1,7 +1,14 @@
 from typing import List, Dict
 
 from mcdreforged.api.utils.serializer import Serializable
+
 global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help
+
+
+class AdminCommands(Serializable):
+    to_mcdr: str = "tomcdr"
+    to_minecraft: str = "togame"
+    whitelist: str = "whitelist"
 
 
 class Config(Serializable):
@@ -33,8 +40,4 @@ class Config(Serializable):
         'user': "root",
         'password': "123"
     }
-    admin_commands: Dict[str, str] = {
-        'to_mcdr': "tomcdr",
-        'to_minecraft': "togame",
-        'whitelist': "whitelist"
-    }
+    admin_commands: Dict[str, str] = AdminCommands()
