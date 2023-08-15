@@ -40,4 +40,3 @@ class Config(Serializable):
         'user': "root",
         'password': "123"
     }
-    admin_commands: dict = AdminCommands()

@@ -12,11 +12,11 @@ except ImportError:
 
 from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, connect_and_insert_db,
                             connect_and_delete_data)
-from .config import Config
+from .config import Config, AdminCommands
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
-global whitelist_help, admin_whitelist_help
+global whitelist_help, admin_whitelist_help, admins_command
 __mcdr_server: PluginServerInterface
 data: dict
 
@@ -41,30 +41,30 @@ def initialize_help_info():
 --(๑•̀ㅂ•́)و✧--'''
     if config.debug:
         admin_help_info = f'''{config.server_name}·管理员·帮助菜单
-    #{config.admin_commands['to_mcdr']} 使用MCDR命令
-    #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+    #{admins_command.to_mcdr} 使用MCDR命令
+    #{admins_command.to_minecraft} 使用Minecraft命令
     #debug 临时开启或关闭debug模式
     #debug_json 测试Json数据包
 --(๑•̀ㅂ•́)و✧--'''
     else:
         admin_help_info = f'''{config.server_name}·管理员·帮助菜单
-    #{config.admin_commands['to_mcdr']} 使用MCDR命令
-    #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+    #{admins_command.to_mcdr} 使用MCDR命令
+    #{admins_command.to_minecraft} 使用Minecraft命令
     #debug 临时开启或关闭debug模式
 --(๑•̀ㅂ•́)و✧--'''
     help_private_info = f'''私聊·帮助菜单
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound 绑定相关帮助列表
-    #{config.admin_commands['whitelist']} 白名单相关帮助列表
+    #{admins_command.whitelist} 白名单相关帮助列表
 --(๑•̀ㅂ•́)و✧--'''
     admin_help_private_info = f'''私聊·帮助菜单·管理特供
     #help 获取本条信息
     #list 获取在线玩家列表
     #bound 绑定相关帮助列表
-    #{config.admin_commands['whitelist']} 白名单相关帮助列表
-    #{config.admin_commands['to_mcdr']} 使用MCDR命令
-    #{config.admin_commands['to_minecraft']} 使用Minecraft命令
+    #{admins_command.whitelist} 白名单相关帮助列表
+    #{admins_command.to_mcdr} 使用MCDR命令
+    #{admins_command.to_minecraft} 使用Minecraft命令
 --(๑•̀ㅂ•́)و✧--'''
     admin_bound_help = '''私聊·帮助菜单·bound
     #bound list 查看绑定列表
@@ -74,14 +74,14 @@ def initialize_help_info():
     bound_help = '''私聊·帮助菜单·bound
     #bound check <qq/player> <ID> 查询绑定信息
 --(๑•̀ㅂ•́)و✧--'''
-    whitelist_help = f'''私聊·帮助菜单·{config.admin_commands['whitelist']}
-    #{config.admin_commands['whitelist']} check <player ID> 查询白名单信息
+    whitelist_help = f'''私聊·帮助菜单·{admins_command.whitelist}
+    #{admins_command.whitelist} check <player ID> 查询白名单信息
 --(๑•̀ㅂ•́)و✧--'''
-    admin_whitelist_help = f'''私聊·帮助菜单·{config.admin_commands['whitelist']}
-    #{config.admin_commands['whitelist']} add <player ID> 添加白名单
-    #{config.admin_commands['whitelist']} remove <player ID> 删除白名单
-    #{config.admin_commands['whitelist']} list 列出白名单
-    #{config.admin_commands['whitelist']} check <player ID> 查询白名单信息
+    admin_whitelist_help = f'''私聊·帮助菜单·{admins_command.whitelist}
+    #{admins_command.whitelist} add <player ID> 添加白名单
+    #{admins_command.whitelist} remove <player ID> 删除白名单
+    #{admins_command.whitelist} list 列出白名单
+    #{admins_command.whitelist} check <player ID> 查询白名单信息
 --(๑•̀ㅂ•́)و✧--'''
 
 
@@ -150,9 +150,10 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status
+        debug_status, admins_command
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
+    admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
     debug_status = config.debug
     initialize_help_info()
     wait_list = []
@@ -445,7 +446,7 @@ def pares_private_command(send_id: str, command: str):
             return bound_help
 
     # whitelist 命令
-    elif command[0] == config.admin_commands['whitelist'] and 1 < len(command) < 4:
+    elif command[0] == admins_command.whitelist and 1 < len(command) < 4:
         white_list = get_whitelist()
         if send_id in str(config.admins):
             # add 命令
@@ -508,14 +509,14 @@ def pares_private_command(send_id: str, command: str):
                 return f'{command[2]} 不在此服务器白名单！'
         elif command[1] == 'check' and len(command) != 3:
             return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} check <player ID>'
-    elif command[0] == config.admin_commands['whitelist'] and not 1 < len(command) < 4:
+    elif command[0] == admins_command.whitelist and not 1 < len(command) < 4:
         if send_id in str(config.admins):
             return admin_whitelist_help
         else:
             return whitelist_help
 
     # tomcdr 命令
-    elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
+    elif command[0] == admins_command.to_mcdr and len(command) >= 2:
         if send_id in str(config.admins):
             global answer
             user_list = get_user_list()
@@ -529,16 +530,16 @@ def pares_private_command(send_id: str, command: str):
                 return "命令错误或没有回复！"
         else:
             return '抱歉您不是管理员，无权使用该命令！'
-    elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
+    elif command[0] == admins_command.to_mcdr and len(command) < 2:
         return f'错误的格式，请使用 #{config.admin_commands["to_mcdr"]} <command>'
 
     # togame 命令
-    elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
+    elif command[0] == admins_command.to_minecraft and len(command) >= 2:
         if send_id in str(config.admins):
             return rcon_execute(' '.join(command[1:]))
         else:
             return '抱歉您不是管理员，无权使用该命令！'
-    elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
+    elif command[0] == admins_command.to_minecraft and len(command) < 2:
         return f'错误的格式，请使用 #{config.admin_commands["to_minecraft"]} <command>'
 
 
@@ -600,7 +601,7 @@ def pares_group_command(send_id: str, command: str):
             return '错误的格式，请使用 #bound <ID>'
 
     # tomcdr 命令
-    elif command[0] == config.admin_commands['to_mcdr'] and len(command) >= 2:
+    elif command[0] == admins_command.to_mcdr and len(command) >= 2:
         if send_id in str(config.admins):
             global answer
             user_list = get_user_list()
@@ -614,17 +615,17 @@ def pares_group_command(send_id: str, command: str):
                 return "命令错误或没有回复！"
         else:
             return '抱歉您不是管理员，无权使用该命令！'
-    elif command[0] == config.admin_commands['to_mcdr'] and len(command) < 2:
+    elif command[0] == admins_command.to_mcdr and len(command) < 2:
         if config.main_server:  # 确认是否需要回复
             return f'错误的格式，请使用 #{config.admin_commands["to_mcdr"]} <command>'
 
     # togame 命令
-    elif command[0] == config.admin_commands['to_minecraft'] and len(command) >= 2:
+    elif command[0] == admins_command.to_minecraft and len(command) >= 2:
         if send_id in str(config.admins):
             return rcon_execute(' '.join(command[1:]))
         else:
             return '抱歉您不是管理员，无权使用该命令！'
-    elif command[0] == config.admin_commands['to_minecraft'] and len(command) < 2:
+    elif command[0] == admins_command.to_minecraft and len(command) < 2:
         return f'错误的格式，请使用 #{config.admin_commands["to_minecraft"]} <command>'
 
     # debug_json 命令
