@@ -16,7 +16,7 @@ from .config import Config, AdminCommands
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
-global whitelist_help, admin_whitelist_help, admins_command
+global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id
 __mcdr_server: PluginServerInterface
 data: dict
 
@@ -150,7 +150,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status, admins_command
+        debug_status, admins_command, time1, time2, old_send_id
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
@@ -159,6 +159,9 @@ def on_load(server: PluginServerInterface, _):
     wait_list = []
     online_players = []
     debug_json_mode = 0
+    time1 = time.perf_counter()
+    time2 = time.perf_counter()
+    old_send_id = ""
 
     if not config.auto_forwards['mc_to_qq']:
         server.register_help_message(': <msg>', '向QQ群发送消息')
@@ -331,32 +334,42 @@ def parse_msg(get_json):
 
 # 进出群处理
 def join_and_leave_group(get_json):
+    global time1, time2, old_send_id
     send_id = str(get_json['user_id'])
+    time2 = time.perf_counter()
     if get_json['notice_type'] == 'group_increase':  # 进群处理
         if config.auto_forwards['qq_to_mc']:  # 是否已开启自动转发
-            if config.main_server:
+            if config.main_server and ((time1 - time2) > 5 and old_send_id == send_id):
                 send_group_qq(get_json['group_id'],
                               f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器将自动把群消息同步至服务器聊天栏")
+                old_send_id = send_id
+                time1 = time.perf_counter()
         else:
-            if config.main_server:
+            if config.main_server and ((time1 - time2) > 5 and old_send_id == send_id):
                 send_group_qq(get_json['group_id'],
                               f"[CQ:at,qq={send_id}] 在绑定 ID 前无法互通消息，请使用 #bound <ID> 绑定游戏ID，注：服务器需使用命令: "
                               f"<msg>把群消息同步至服务器聊天栏")
+                old_send_id = send_id
+                time1 = time.perf_counter()
     elif get_json['notice_type'] == 'group_decrease':  # 退群处理
         user_list = get_user_list()
         if config.whitelist_remove_with_leave:  # 是否自动删除白名单
             if send_id in user_list.keys():  # 确认是否绑定过
                 send_execute_mc(f'whitelist remove {user_list[send_id]}')
-                send_group_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群，已在服务器移除他的白名单')
+                if config.main_server:
+                    send_group_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群，已在服务器移除他的白名单')
                 delete_user(send_id)
             else:
-                send_group_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
+                if config.main_server:
+                    send_group_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
         else:
             if send_id in user_list.keys():
-                send_group_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群')
+                if config.main_server:
+                    send_group_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群')
                 delete_user(send_id)
             else:
-                send_group_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
+                if config.main_server:
+                    send_group_qq(get_json['group_id'], f'{send_id} 已退群，此人未在服务器绑定')
 
 
 # 私聊命令处理模块
