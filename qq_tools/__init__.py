@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
 from mcdreforged.api.all import *
+
 try:  # 试图导入mysql处理
     import mysql.connector
 except ImportError:
@@ -16,7 +17,7 @@ from .config import Config, AdminCommands
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
-global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id
+global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id, start_time1
 __mcdr_server: PluginServerInterface
 data: dict
 
@@ -150,7 +151,8 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status, admins_command, time1, time2, old_send_id
+        debug_status, admins_command, time1, time2, old_send_id, start_time1
+    start_time1 = time.perf_counter()
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
@@ -228,10 +230,11 @@ def on_server_startup(_):
                 time.sleep(0.5)
 
     if config.forwards_server_start_and_stop:
+        start_time2 = time.perf_counter()
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
-            msg_start = config.server_name + ' 启动完成，服务器已启用自动转发QQ信息！'
+            msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用自动转发QQ信息！'
         else:
-            msg_start = config.server_name + ' 启动完成，服务器已启用手动转发QQ信息！'
+            msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用手动转发QQ信息！'
         for i in config.groups:
             send_group_qq(i, msg_start)
 
@@ -246,6 +249,8 @@ def on_server_stop(_, __):
 
 
 def on_unload(_):
+    httpd.shutdown()
+    httpd.server_close()
     __mcdr_server.logger.info("Http server stopping now...")
     time.sleep(0.5)
 
@@ -357,7 +362,8 @@ def join_and_leave_group(get_json):
             if send_id in user_list.keys():  # 确认是否绑定过
                 send_execute_mc(f'whitelist remove {user_list[send_id]}')
                 if config.main_server:
-                    send_group_qq(get_json['group_id'], f'{user_list[send_id]}({send_id}) 已退群，已在服务器移除他的白名单')
+                    send_group_qq(get_json['group_id'],
+                                  f'{user_list[send_id]}({send_id}) 已退群，已在服务器移除他的白名单')
                 delete_user(send_id)
             else:
                 if config.main_server:
@@ -606,9 +612,11 @@ def pares_group_command(send_id: str, command: str):
                     if config.main_server:
                         return f'[CQ:at,qq={send_id}] 已在服务器成功绑定'
                 else:
-                    return f'[CQ:at,qq={send_id}] 不合法的用户名！'
+                    if config.main_server:
+                        return f'[CQ:at,qq={send_id}] 不合法的用户名！'
             else:
-                return f'[CQ:at,qq={send_id}] 玩家名不存在！'
+                if config.main_server:
+                    return f'[CQ:at,qq={send_id}] 玩家名不存在！'
     elif command[0] == 'bound' and len(command) != 2:
         if config.main_server:  # 确认是否需要回复
             return '错误的格式，请使用 #bound <ID>'
@@ -685,9 +693,13 @@ def send_group_qq(gid: int, msg: str):
         msg = msg.replace('#', '%23')
         if debug_status:
             __mcdr_server.logger.info(msg)
-        requests.get(
-            url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port, gid,
-                                                                                msg))
+        try:
+            requests.get(
+                url='http://{0}:{1}/send_group_msg?group_id={2}&message={3}'.format(config.send_host, config.send_port,
+                                                                                    gid,
+                                                                                    msg))
+        except requests.exceptions.ConnectionError:
+            __mcdr_server.logger.warning(f"Can't found cq-gohttp Server,The message: {msg}({gid})")
 
 
 # 发送私聊消息至QQ
@@ -696,9 +708,13 @@ def send_private_qq(uid: int, msg: str):
     msg = f"{config.server_name}·" + msg
     if debug_status:
         __mcdr_server.logger.info(msg)
-    requests.get(
-        url='http://{0}:{1}/send_private_msg?user_id={2}&message={3}'.format(config.send_host, config.send_port, uid,
-                                                                             msg))
+    try:
+        requests.get(
+            url='http://{0}:{1}/send_private_msg?user_id={2}&message={3}'.format(config.send_host, config.send_port,
+                                                                                 uid,
+                                                                                 msg))
+    except requests.exceptions.ConnectionError:
+        __mcdr_server.logger.warning(f"Can't found cq-gohttp Server,The message: {msg}({uid})")
 
 
 # 把命令执行独立出来，以防服务器处在待机状态
