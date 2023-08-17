@@ -24,7 +24,7 @@ data: dict
 
 def initialize_help_info():
     global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help, admin_bound_help
-    global whitelist_help, admin_whitelist_help
+    global whitelist_help, admin_whitelist_help, server_first_start
     if config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
@@ -151,8 +151,9 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status, admins_command, time1, time2, old_send_id, start_time1
+        debug_status, admins_command, time1, time2, old_send_id, start_time1, server_first_start
     start_time1 = time.perf_counter()
+    server_first_start = True
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
@@ -197,7 +198,7 @@ def on_load(server: PluginServerInterface, _):
 
 
 def on_server_startup(_):
-    global server_status
+    global server_status, server_first_start
     server_status = True
     if wait_list:  # 服务器核心重启后处理堆积命令
         for i in wait_list:
@@ -232,9 +233,17 @@ def on_server_startup(_):
     if config.forwards_server_start_and_stop:
         start_time2 = time.perf_counter()
         if config.auto_forwards['qq_to_mc']:  # 检测服务器是否自动转发QQ信息
-            msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用自动转发QQ信息！'
+            if server_first_start:
+                msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用自动转发QQ信息！'
+                server_first_start = False
+            else:
+                msg_start = config.server_name + f' 服务器核心重启完成！服务器已启用自动转发QQ信息！'
         else:
-            msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用手动转发QQ信息！'
+            if server_first_start:
+                msg_start = config.server_name + f' 启动完成，用时 {start_time2 - start_time1} 秒！服务器已启用手动转发QQ信息！'
+                server_first_start = False
+            else:
+                msg_start = config.server_name + f' 服务器核心重启完成！服务器已启用手动转发QQ信息！'
         for i in config.groups:
             send_group_qq(i, msg_start)
 
