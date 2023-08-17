@@ -10,32 +10,38 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 
 ## 配置说明
 
-| 配置项 | 含义 | 默认值 | 注意事项 |
-| - | - | - | - |
-| `send_host` | 机器人发送端口 | `127.0.0.1` | 你的go-cqhttp机器人的HTTP地址 |
-| `send_port` | 机器人发送端口 | `5700` | 你的go-cqhttp机器人的HTTP地址 |
-| `post_port` | 机器人接收端口 | `0.0.0.0` | 你的go-cqhttp机器人的PostServer地址 |
-| `post_port` | 机器人接收端口 | `5701` | 你的go-cqhttp机器人的PostServer地址 |
-| `groups` | 群列表 | `[1234563, 1234564]` | 需要处理的群号 |
-| `admins` | 管理员列表 | `[1234567, 1234568]` | 管理员的QQ号 |
-| `server_name` | 服务器名 | `'Survival Server'` | 发送到qq时会加上server_name的前缀 |
-| `main_server` | 是否为主服务器 | `true` | 关乎于大量命令是否会有回复 |
-| `whitelist_add_with_bound` | 群成员绑定游戏 id 时自动添加白名单 | `true` | 关闭的时候可以写理由 |
-| `why_no_whitelist` | 为什么服务器不会自动加白名单 | `空` | 如果空着就不会有任何提示 |
-| `whitelist_path` | 白名单的位置 | `./server/whitelist.json` | 如果你的server不叫server就改一个吧 |
-| `whitelist_remove_with_leave` | 退群自动解绑 | `true` | 白名单和绑定都受此影响 |
-| `forwards_mcdr_command` | 自动转发服务器信息的时候是否过滤MCDR命令 | `False` | 建议关了，挺危险的 |
-| `forwards_server_start_and_stop` | 是否转发服务器核心启停的消息 | `true` | 有自动启停的时候挺好用的 |
-| `debug` | 是否开启debug模式 | `false` | 可以在群里使用`#debug <on/off>`来临时开启或关闭 |
-| `online_mode` | 是否开启正版用户名检测 | `true` | 离线服只检测玩家名是否为合法的、没有特殊字符的</br>**不支持中文** |
-| `mc_to_qq` | 是否自动转发服务器消息到QQ | `false` | 开启的时候会转发玩家进出服的消息 |
-| `qq_to_mc` | 是否自动转发QQ消息到服务器 | `false` | 开启时群内用户必须绑定，不然会一直提示 |
-| `mysql_enable` | 是否启用MySQL支持 | `false` | 需安装`mysql-connector-python`包 |
-| `mysql_config` | MySQL的设置 | `略` | 数据库的权限必须分配给这个用户</br>**不要使用root用户，危险！** |
-| `to_mcdr` | 设置 执行MCDR命令功能 的命令名称 | `tomcdr` | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
-| `to_minecraft` | 设置 执行RCON命令功能 的命令名称 | `togame` | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
-| `whitelist` | 设置 白名单控制功能 的命令名称 | `whitelist` | 私聊`#help`内会自动修改，群组服建议使用不同的命令 |
+> `config.json` 配置项
 
+| 配置项                              | 含义                     | 默认值                       | 注意事项                                   |
+|----------------------------------|------------------------|---------------------------|----------------------------------------|
+| `send_host`                      | 机器人发送端口                | `127.0.0.1`               | 你的go-cqhttp机器人的HTTP地址                  |
+| `send_port`                      | 机器人发送端口                | `5700`                    | 你的go-cqhttp机器人的HTTP地址                  |
+| `post_port`                      | 机器人接收端口                | `0.0.0.0`                 | 你的go-cqhttp机器人的PostServer地址            |
+| `post_port`                      | 机器人接收端口                | `5701`                    | 你的go-cqhttp机器人的PostServer地址            |
+| `groups`                         | 群列表                    | `[1234563, 1234564]`      | 需要处理的群号                                |
+| `admins`                         | 管理员列表                  | `[1234567, 1234568]`      | 管理员的QQ号                                |
+| `server_name`                    | 服务器名                   | `'Survival Server'`       | 发送到qq时会加上server_name的前缀                |
+| `main_server`                    | 是否为主服务器                | `true`                    | 关乎于大量命令是否会有回复                          |
+| `whitelist_add_with_bound`       | 群成员绑定游戏 id 时自动添加白名单    | `true`                    | 关闭的时候可以写理由                             |
+| `why_no_whitelist`               | 为什么服务器不会自动加白名单         | `空`                       | 如果空着就不会有任何提示                           |
+| `whitelist_path`                 | 白名单的位置                 | `./server/whitelist.json` | 如果你的server不叫server就改一个吧                |
+| `whitelist_remove_with_leave`    | 退群自动解绑                 | `true`                    | 白名单和绑定都受此影响                            |
+| `forwards_mcdr_command`          | 自动转发服务器信息的时候是否过滤MCDR命令 | `False`                   | 建议关了，挺危险的                              |
+| `forwards_server_start_and_stop` | 是否转发服务器核心启停的消息         | `true`                    | 有自动启停的时候挺好用的                           |
+| `debug`                          | 是否开启debug模式            | `false`                   | 可以在群里使用`#debug <on/off>`来临时开启或关闭       |
+| `online_mode`                    | 是否开启正版用户名检测            | `true`                    | 离线服只检测玩家名是否为合法的、没有特殊字符的</br>**不支持中文**  |
+| `mc_to_qq`                       | 是否自动转发服务器消息到QQ         | `false`                   | 开启的时候会转发玩家进出服的消息                       |
+| `qq_to_mc`                       | 是否自动转发QQ消息到服务器         | `false`                   | 开启时群内用户必须绑定，不然会一直提示                    |
+| `mysql_enable`                   | 是否启用MySQL支持            | `false`                   | 需安装`mysql-connector-python`包           |
+| `mysql_config`                   | MySQL的设置               | `略`                       | 数据库的权限必须分配给这个用户</br>**不要使用root用户，危险！** |
+
+> `AdminCommand.json` 配置项
+
+| 配置项            | 含义                  | 默认值         | 注意事项                             |
+|----------------|---------------------|-------------|----------------------------------|
+| `to_mcdr`      | 设置 执行MCDR命令功能 的命令名称 | `tomcdr`    | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
+| `to_minecraft` | 设置 执行RCON命令功能 的命令名称 | `togame`    | `#admin_help`内会自动修改，群组服建议使用不同的命令 |
+| `whitelist`    | 设置 白名单控制功能 的命令名称    | `whitelist` | 私聊`#help`内会自动修改，群组服建议使用不同的命令     |
 
 ## 命令帮助
 
