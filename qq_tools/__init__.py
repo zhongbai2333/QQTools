@@ -548,9 +548,9 @@ def pares_private_command(send_id: str, command: str):
         if send_id in str(config.admins):
             global answer
             user_list = get_user_list()
-            answer = None
+            answer = ""
             __mcdr_server.logger.info(f"[{user_list[send_id]}] >> {' '.join(command[1:])}")
-            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot"))
+            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource(__mcdr_server, "QQBot"))
             if answer:
                 __mcdr_server.logger.info(answer)
                 return str(answer)
@@ -635,9 +635,9 @@ def pares_group_command(send_id: str, command: str):
         if send_id in str(config.admins):
             global answer
             user_list = get_user_list()
-            answer = None
+            answer = ""
             __mcdr_server.logger.info(f"[{user_list[send_id]}] >> {' '.join(command[1:])}")
-            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource("QQBot"))
+            __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource(__mcdr_server, "QQBot"))
             if answer:
                 __mcdr_server.logger.info(answer)
                 return str(answer)
@@ -829,26 +829,30 @@ def real_name(username: str):
 
 class RobotCommandSource(CommandSource):
     # 初始化方法，传入机器人的名字和权限等级
-    def __init__(self, name):
+    def __init__(self, server: ServerInterface, name):
+        self.__server = server
         self.name = name
 
     # 重写get_permission_level方法，返回机器人的权限等级
-    def get_permission_level(self):
-        return PermissionLevel.OWNER
+    def get_permission_level(self) -> int:
+        return 4
 
-    # 重写get_name方法，返回机器人的名字
-    def get_name(self):
-        return self.name
+    @property
+    def is_player(self) -> bool:
+        return True
 
-    # 重写is_player方法，返回False，表示这不是一个玩家
-    def is_player(self):
+    @property
+    def is_console(self) -> bool:
         return False
 
     # 重写reply方法，用来回复命令来源
     def reply(self, message, **kwargs):
         # 返回命令结果给answer
         global answer
-        answer = message
+        answer += message + '\n'
+
+    def get_server(self):
+        return self.__server
 
     def __str__(self):
         return self.name
