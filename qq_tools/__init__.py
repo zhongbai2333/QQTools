@@ -17,14 +17,14 @@ from .config import Config, AdminCommands
 
 global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
-global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id, start_time1
+global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id, start_time1, server_first_start
 __mcdr_server: PluginServerInterface
 data: dict
 
 
 def initialize_help_info():
     global help_info, admin_help_info, help_private_info, admin_help_private_info, bound_help, admin_bound_help
-    global whitelist_help, admin_whitelist_help, server_first_start
+    global whitelist_help, admin_whitelist_help
     if config.auto_forwards['qq_to_mc']:
         help_info = '''-帮-助-菜-单-
     #help 获取本条信息
