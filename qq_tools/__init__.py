@@ -692,8 +692,9 @@ def pares_group_command(send_id: str, command: str):
 
     # 未知命令
     else:
-        if config.main_server:
-            return '错误的命令，请使用 #help 获取帮助！'
+        if command[0] not in config.whitelist_command:
+            if config.main_server:
+                return '错误的命令，请使用 #help 获取帮助！'
 
 
 # 发送群聊消息至QQ

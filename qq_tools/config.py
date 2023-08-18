@@ -40,3 +40,4 @@ class Config(Serializable):
         'user': "root",
         'password': "123"
     }
+    whitelist_command: List[str] = ["tomcdr", "togame"]

@@ -34,6 +34,8 @@ QQChat的升级版本，我重写了机器人逻辑，使用go-cqhttp作为机�
 | `qq_to_mc`                       | 是否自动转发QQ消息到服务器         | `false`                   | 开启时群内用户必须绑定，不然会一直提示                    |
 | `mysql_enable`                   | 是否启用MySQL支持            | `false`                   | 需安装`mysql-connector-python`包           |
 | `mysql_config`                   | MySQL的设置               | `略`                       | 数据库的权限必须分配给这个用户</br>**不要使用root用户，危险！** |
+| `whitelist_command`              | 不会触发未知命令的消息            | `["tomcdr", "togame"]`    | 群组服的自定义命令可以用这个防止弹出未知命令（只有主服务器需要）       |
+
 
 > `AdminCommand.json` 配置项
 
