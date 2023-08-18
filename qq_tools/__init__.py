@@ -151,9 +151,10 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status, admins_command, time1, time2, old_send_id, start_time1, server_first_start
+        debug_status, admins_command, time1, time2, old_send_id, start_time1, server_first_start, server_status
     start_time1 = time.perf_counter()
     server_first_start = True
+    server_status = True
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
@@ -551,6 +552,7 @@ def pares_private_command(send_id: str, command: str):
             answer = ""
             __mcdr_server.logger.info(f"[{user_list[send_id]}] >> {' '.join(command[1:])}")
             __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource(__mcdr_server, "QQBot"))
+            answer = re.compile(r"§\w").sub("", answer)
             if answer:
                 __mcdr_server.logger.info(answer)
                 return str(answer)
@@ -638,6 +640,7 @@ def pares_group_command(send_id: str, command: str):
             answer = ""
             __mcdr_server.logger.info(f"[{user_list[send_id]}] >> {' '.join(command[1:])}")
             __mcdr_server.execute_command(' '.join(command[1:]), RobotCommandSource(__mcdr_server, "QQBot"))
+            answer = re.compile(r"§\w").sub("", answer)
             if answer:
                 __mcdr_server.logger.info(answer)
                 return str(answer)
@@ -839,17 +842,17 @@ class RobotCommandSource(CommandSource):
 
     @property
     def is_player(self) -> bool:
-        return True
+        return False
 
     @property
     def is_console(self) -> bool:
-        return False
+        return True
 
     # 重写reply方法，用来回复命令来源
     def reply(self, message, **kwargs):
         # 返回命令结果给answer
         global answer
-        answer += message + '\n'
+        answer += str(message).rstrip("\n") + '\n'
 
     def get_server(self):
         return self.__server
