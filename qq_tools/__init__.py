@@ -468,6 +468,11 @@ def pares_private_command(send_id: str, command: str):
                 return '错误的格式，请使用 #bound check <qq/player> <ID>'
         elif command[1] == 'check' and len(command) != 4:
             return '错误的格式，请使用 #bound check <qq/player> <ID>'
+        else:
+            if send_id in str(config.admins):
+                return admin_bound_help
+            else:
+                return bound_help
     elif command[0] == 'bound' and not 1 < len(command) < 5:
         if send_id in str(config.admins):
             return admin_bound_help
@@ -538,6 +543,11 @@ def pares_private_command(send_id: str, command: str):
                 return f'{command[2]} 不在此服务器白名单！'
         elif command[1] == 'check' and len(command) != 3:
             return f'错误的格式，请使用 #{config.admin_commands["whitelist"]} check <player ID>'
+        else:
+            if send_id in str(config.admins):
+                return admin_whitelist_help
+            else:
+                return whitelist_help
     elif command[0] == admins_command.whitelist and not 1 < len(command) < 4:
         if send_id in str(config.admins):
             return admin_whitelist_help
@@ -717,17 +727,18 @@ def send_group_qq(gid: int, msg: str):
 
 # 发送私聊消息至QQ
 def send_private_qq(uid: int, msg: str):
-    msg = msg.replace('#', '%23')
-    msg = f"{config.server_name}·" + msg
-    if debug_status:
-        __mcdr_server.logger.info(msg)
-    try:
-        requests.get(
-            url='http://{0}:{1}/send_private_msg?user_id={2}&message={3}'.format(config.send_host, config.send_port,
-                                                                                 uid,
-                                                                                 msg))
-    except requests.exceptions.ConnectionError:
-        __mcdr_server.logger.warning(f"Can't found cq-gohttp Server,The message: {msg}({uid})")
+    if msg:
+        msg = msg.replace('#', '%23')
+        msg = f"{config.server_name}·" + msg
+        if debug_status:
+            __mcdr_server.logger.info(msg)
+        try:
+            requests.get(
+                url='http://{0}:{1}/send_private_msg?user_id={2}&message={3}'.format(config.send_host, config.send_port,
+                                                                                     uid,
+                                                                                     msg))
+        except requests.exceptions.ConnectionError:
+            __mcdr_server.logger.warning(f"Can't found cq-gohttp Server,The message: {msg}({uid})")
 
 
 # 把命令执行独立出来，以防服务器处在待机状态
