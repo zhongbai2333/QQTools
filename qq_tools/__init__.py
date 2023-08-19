@@ -15,9 +15,9 @@ from .MySQL_Control import (connect_and_query_db, create_table_if_not_exists, co
                             connect_and_delete_data)
 from .config import Config, AdminCommands
 
-global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, server_status, wait_list
+global httpd, config, data, help_info, online_players, admin_help_info, answer, mysql_use, wait_list, server_first_start
 global debug_json_mode, help_private_info, admin_help_private_info, bound_help, debug_status, admin_bound_help
-global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id, start_time1, server_first_start
+global whitelist_help, admin_whitelist_help, admins_command, time1, time2, old_send_id, start_time1
 __mcdr_server: PluginServerInterface
 data: dict
 
@@ -151,10 +151,9 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
 def on_load(server: PluginServerInterface, _):
     global __mcdr_server, config, data, help_info, online_players, admin_help_info, wait_list, debug_json_mode, \
-        debug_status, admins_command, time1, time2, old_send_id, start_time1, server_first_start, server_status
+        debug_status, admins_command, time1, time2, old_send_id, start_time1, server_first_start
     start_time1 = time.perf_counter()
     server_first_start = True
-    server_status = True
     __mcdr_server = server  # mcdr init
     config = server.load_config_simple(target_class=Config)  # Get Config setting
     admins_command = server.load_config_simple('AdminCommand.json', target_class=AdminCommands)
@@ -199,8 +198,7 @@ def on_load(server: PluginServerInterface, _):
 
 
 def on_server_startup(_):
-    global server_status, server_first_start
-    server_status = True
+    global server_first_start
     if wait_list:  # 服务器核心重启后处理堆积命令
         for i in wait_list:
             send_execute_mc(i)
@@ -250,8 +248,6 @@ def on_server_startup(_):
 
 
 def on_server_stop(_, __):
-    global server_status
-    server_status = False
     if config.forwards_server_start_and_stop:
         msg_stop = config.server_name + ' 服务器核心已关闭！'
         for i in config.groups:
@@ -601,7 +597,7 @@ def pares_group_command(send_id: str, command: str):
 
     # list 命令
     elif command[0] == 'list':
-        if server_status:
+        if __mcdr_server.is_server_running():
             return f"{config.server_name} 在线玩家共{len(online_players)}人\n" \
                    f"玩家列表: {', '.join(online_players)}"
         else:
@@ -743,7 +739,7 @@ def send_private_qq(uid: int, msg: str):
 
 # 把命令执行独立出来，以防服务器处在待机状态
 def send_execute_mc(command: str):
-    if server_status:  # 确认服务器是否启动
+    if __mcdr_server.is_server_running():  # 确认服务器是否启动
         __mcdr_server.execute(command)
         __mcdr_server.logger.info(f"QQTools execute:{command}")
     else:
