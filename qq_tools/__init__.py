@@ -194,7 +194,7 @@ def on_load(server: PluginServerInterface, _):
         __mcdr_server.logger.info("MySQL数据库功能已正常启动！")
         cq_listen(config.post_host, config.post_port)  # 调用监听服务器启动模块
     elif config.mysql_enable and not mysql:
-        __mcdr_server.logger.info("QQTools无法启动，请安装mysql-connector-python或关闭数据库功能！")
+        __mcdr_server.logger.error("QQTools无法启动，请安装mysql-connector-python或关闭数据库功能！")
 
 
 def on_server_startup(_):
@@ -269,10 +269,10 @@ def on_player_joined(_, player, __):
         for i in config.groups:
             send_group_qq(i, f'{player} joined the game')
     if config.auto_forwards['mc_to_qq']:  # 自动提醒
-        time.sleep(0.5)
+        time.sleep(0.1)
         __mcdr_server.tell(player, "QQTools提醒您，服务器已启用自动转发MC消息！")
     else:
-        time.sleep(0.5)
+        time.sleep(0.1)
         __mcdr_server.tell(player, "QQTools提醒您，服务器已启用手动转发MC消息！")
 
 
@@ -387,6 +387,8 @@ def join_and_leave_group(get_json):
 # 私聊命令处理模块
 def pares_private_command(send_id: str, command: str):
     command = command.split(' ')
+    if command[-1] == "":
+        command.pop()
 
     # help 命令
     if command[0] == 'help':
@@ -583,6 +585,8 @@ def pares_private_command(send_id: str, command: str):
 def pares_group_command(send_id: str, command: str):
     global debug_status
     command = command.split(' ')  # 解析信息为列表
+    if command[-1] == "":
+        command.pop()
 
     # help 命令
     if command[0] == 'help' and config.main_server:
@@ -637,6 +641,23 @@ def pares_group_command(send_id: str, command: str):
     elif command[0] == 'bound' and len(command) != 2:
         if config.main_server:  # 确认是否需要回复
             return '错误的格式，请使用 #bound <ID>'
+
+    # bound_check 命令
+    elif command[0] == 'bound_check' and len(command) == 2:
+        if config.main_server:
+            if send_id in str(config.admins):
+                user_list = get_user_list()
+                at_name = command[1]
+                at_name = at_name[10:-1]
+                if at_name in user_list.keys():
+                    return f'[CQ:at,qq={send_id}] 您查询的 {command[1]}({at_name}) 绑定的ID为 {user_list[at_name]}'
+                else:
+                    return f'[CQ:at,qq={send_id}] 您查询的 {command[1]}({at_name}) 未绑定！'
+            else:
+                return '抱歉您不是管理员，无权使用该命令！'
+    elif command[0] == 'bound_check' and len(command) != 2:
+        if config.main_server:  # 确认是否需要回复
+            return '错误的格式，请使用 #bound_check <@ID>'
 
     # tomcdr 命令
     elif command[0] == admins_command.to_mcdr and len(command) >= 2:
