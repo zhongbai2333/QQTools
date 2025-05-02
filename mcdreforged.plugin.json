@@ -1,6 +1,6 @@
 {
   "id": "qq_tools",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "name": "QQTools",
   "description": {
     "en_us": "Useful Tools with QQ",
@@ -9,5 +9,12 @@
   "author": "zhongbai233",
   "link": "https://github.com/zhongbai2333/QQTools",
   "dependencies": {
-  }
+  },
+  "entrypoint": "qq_tools",
+  "archive_name": "QQTools-v{version}.mcdr",
+  "resources": [
+    "lang",
+    "__main__.py",
+    "LICENSE"
+    ]
 }
