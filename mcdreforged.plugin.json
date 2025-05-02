@@ -11,7 +11,7 @@
   "dependencies": {
   },
   "entrypoint": "qq_tools",
-  "archive_name": "QQTools-v{version}.mcdr",
+  "archive_name": "QQTools-v{version}-Beta.mcdr",
   "resources": [
     "lang",
     "__main__.py",

@@ -783,7 +783,6 @@ def pares_group_command(send_id: str, command: str):
 # 发送群聊消息至QQ
 def send_group_qq(gid: int, msg: str):
     if msg:
-        msg = msg.replace("#", "%23")
         payload = json.dumps(
             {
                 "group_id": gid,
@@ -812,7 +811,6 @@ def send_group_qq(gid: int, msg: str):
 # 发送私聊消息至QQ
 def send_private_qq(uid: int, msg: str):
     if msg:
-        msg = msg.replace("#", "%23")
         msg = f"{config.server_name}·" + msg
         payload = json.dumps(
             {
