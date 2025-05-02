@@ -335,7 +335,7 @@ def parse_msg(get_json):
         get_json["message_type"] == "group" and get_json["group_id"] in config.groups
     ):  # 处理群聊消息
         send_id = str(get_json["user_id"])
-        msg = get_json["message"]
+        msg = get_json["raw_message"]
         if msg[0] == "#":  # 分辨命令消息
             send_group_qq(
                 get_json["group_id"], pares_group_command(send_id, msg[1:])
@@ -373,7 +373,7 @@ def parse_msg(get_json):
                 )
     elif get_json["message_type"] == "private":  # 处理私聊消息
         send_id = str(get_json["user_id"])
-        msg = get_json["message"]
+        msg = get_json["raw_message"]
         if msg[0] == "#":  # 分辨命令消息
             send_private_qq(
                 get_json["user_id"], pares_private_command(send_id, msg[1:])
